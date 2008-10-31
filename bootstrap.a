@@ -6,16 +6,19 @@
     .include "hw/chipset.inc"
 
 
+    .code
+
 .export __n_reset
 .proc __n_reset
-    ; This is the native-mode cold-boot entry point.  This procedure
-    ; never returns.
-    ;
-    ; Preparations:
-    ; S = $7FFF.
-    ; Interrupts disabled.
-    ; All registers set to 16-bit width, but otherwise undefined.
-    ; RAM-based exception vectors initialized.  See resetCpuVectorTable.
+    ;; This is the native-mode cold-boot entry point.  This procedure
+    ;; never returns.
+
+    ; Preconditions:
+    ;   S = $7FFF.
+    ;   Interrupts disabled.
+    ;   A, X, Y in 16-bit mode.
+    ;   CPU in native mode.
+    ;   RAM-resident exception/interrupt vector table initialized.
 
     jsr initializeMGIA
     jsr initializeIRQ

@@ -31,6 +31,26 @@
 
 
 ;
+; When the CPU takes an exception, the vectors for those are hard-coded
+; in ROM.  To make the system more flexible, we reflect the exceptions to
+; their final handlers via RAM-resident vectors.
+;
+
+    .code
+
+__n_cop:        jmp (nativeModeCopVector)
+__n_brk:        jmp (nativeModeBrkVector)
+__n_abort:      jmp (nativeModeAbortVector)
+__n_nmi:        jmp (nativeModeNMIVector)
+__n_irq:        jmp (nativeModeIRQVector)
+
+__e_cop:        jmp (emulationModeCopVector)
+__e_abort:      jmp (emulationModeAbortVector)
+__e_nmi:        jmp (emulationModeNMIVector)
+__e_irq:        jmp (emulationModeIRQVector)
+
+
+;
 ; These are the RAM-resident vectors.
 ;
 
@@ -79,16 +99,11 @@ factoryDefaultVectorTable:
 
 
 ;
-; Code responsible for initializing and supporting the interrupt vectors.
-; Also note that the cold-boot/reset entry point is defined here.
-;
-
-    .code
-
-;
 ; All unhandled exceptions are delivered to this general purpose panic
 ; routine.
 ;
+
+    .code
 
 _n_cop:
 _n_brk:
@@ -110,22 +125,8 @@ __e_v3:
 
 
 ;
-; When the CPU takes an exception, the vectors for those are hard-coded
-; in ROM.  To make the system more flexible, we reflect the exceptions to
-; their final handlers via RAM-resident vectors.
+; Code responsible for initializing and supporting the interrupt vectors.
 ;
-
-__n_cop:        jmp (nativeModeCopVector)
-__n_brk:        jmp (nativeModeBrkVector)
-__n_abort:      jmp (nativeModeAbortVector)
-__n_nmi:        jmp (nativeModeNMIVector)
-__n_irq:        jmp (nativeModeIRQVector)
-
-__e_cop:        jmp (emulationModeCopVector)
-__e_abort:      jmp (emulationModeAbortVector)
-__e_nmi:        jmp (emulationModeNMIVector)
-__e_irq:        jmp (emulationModeIRQVector)
-
 
 .export resetCpuVectorTable
 .proc resetCpuVectorTable
@@ -140,6 +141,15 @@ moveAnotherByte:
     bne moveAnotherByte
     rts
 .endproc
+
+
+;
+; The cold-boot/reset entry point is defined here.  Re-vectoring the
+; reset logic is pointless, because the state of the RAM vectors is
+; in an unknown state.  So we reset the RAM vectors as a bare minimum,
+; switch the CPU into 16-bit native mode, then proceed to boot the
+; computer from this minimum pre-configuration.
+;
 
 .import __n_reset
 .proc __e_reset
