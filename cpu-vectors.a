@@ -1,0 +1,158 @@
+    .p816
+    .a16
+    .i16
+
+    .include "include/hw/cpu.inc"
+
+;
+; Hardware vectors, embedded in ROM, force the microprocessor to vector
+; through RAM-resident vectors.
+;
+
+    .segment "BOOTVECTORS"
+
+    .word __n_v0    ; $FFE0
+    .word __n_v1    ; $FFE2
+    .word __n_cop   ; $FFE4
+    .word __n_brk   ; $FFE6
+    .word __n_abort ; $FFE8
+    .word __n_nmi   ; $FFEA
+    .word __n_v6    ; $FFEC
+    .word __n_irq   ; $FFEE
+
+    .word __e_v0    ; $FFF0
+    .word __e_v1    ; $FFF2
+    .word __e_cop   ; $FFF4
+    .word __e_v3    ; $FFF6
+    .word __e_abort ; $FFF8
+    .word __e_nmi   ; $FFFA
+    .word __e_reset ; $FFFC
+    .word __e_irq   ; $FFFE
+
+
+;
+; These are the RAM-resident vectors.
+;
+
+    .segment "BSSEXT"
+
+    .export nativeModeCopVector
+    .export nativeModeBrkVector
+    .export nativeModeAbortVector
+    .export nativeModeNMIVector
+    .export nativeModeIRQVector
+    .export emulationModeCopVector
+    .export emulationModeAbortVector
+    .export emulationModeNMIVector
+    .export emulationModeIRQVector
+
+nativeModeCopVector:        .res 2
+nativeModeBrkVector:        .res 2
+nativeModeAbortVector:      .res 2
+nativeModeNMIVector:        .res 2
+nativeModeIRQVector:        .res 2
+
+emulationModeCopVector:     .res 2
+emulationModeAbortVector:   .res 2
+emulationModeNMIVector:     .res 2
+emulationModeIRQVector:     .res 2
+
+
+;
+; Upon system startup, the above RAM vectors are loaded with these
+; defaults.  These point back into ROM, so that they have valid handlers
+; when the chipset is initialized.
+;
+
+    .rodata
+
+factoryDefaultVectorTable:
+    .word _n_cop
+    .word _n_brk
+    .word _n_abort
+    .word _n_nmi
+    .word _n_irq
+    .word _e_cop
+    .word _e_abort
+    .word _e_nmi
+    .word _e_irq
+
+
+;
+; Code responsible for initializing and supporting the interrupt vectors.
+; Also note that the cold-boot/reset entry point is defined here.
+;
+
+    .code
+
+;
+; All unhandled exceptions are delivered to this general purpose panic
+; routine.
+;
+
+_n_cop:
+_n_brk:
+_n_abort:
+_n_nmi:
+_n_irq:
+_e_cop:
+_e_abort:
+_e_nmi:
+_e_irq:
+
+__n_v0:
+__n_v1:
+__n_v6:
+__e_v0:
+__e_v1:
+__e_v3:
+    WDM WdmReq::ExitEmulator
+
+
+;
+; When the CPU takes an exception, the vectors for those are hard-coded
+; in ROM.  To make the system more flexible, we reflect the exceptions to
+; their final handlers via RAM-resident vectors.
+;
+
+__n_cop:        jmp (nativeModeCopVector)
+__n_brk:        jmp (nativeModeBrkVector)
+__n_abort:      jmp (nativeModeAbortVector)
+__n_nmi:        jmp (nativeModeNMIVector)
+__n_irq:        jmp (nativeModeIRQVector)
+
+__e_cop:        jmp (emulationModeCopVector)
+__e_abort:      jmp (emulationModeAbortVector)
+__e_nmi:        jmp (emulationModeNMIVector)
+__e_irq:        jmp (emulationModeIRQVector)
+
+
+.export resetCpuVectorTable
+.proc resetCpuVectorTable
+    ;;; Restores the RAM-resident CPU exception vectors to their
+    ;;; power-on default settings.
+
+    ldx #17
+moveAnotherByte:
+    lda factoryDefaultVectorTable,x
+    sta nativeModeCopVector,x
+    dex
+    bne moveAnotherByte
+    rts
+.endproc
+
+.import __n_reset
+.proc __e_reset
+    ;;; When the CPU is reset, this is where the CPU starts executing
+    ;;; instructions.  Note that the CPU is in 8-bit 6502 mode when
+    ;;; control reaches here via the RESET vector.
+
+    M65816
+    AX16
+
+    lda #$7FFF
+    tcs
+    jsr resetCpuVectorTable
+    jmp __n_reset
+.endproc
+

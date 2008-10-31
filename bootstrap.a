@@ -1,0 +1,26 @@
+    .p816
+    .a16
+    .i16
+
+    .include "hw/cpu.inc"
+    .include "hw/chipset.inc"
+
+
+.export __n_reset
+.proc __n_reset
+    ; This is the native-mode cold-boot entry point.  This procedure
+    ; never returns.
+    ;
+    ; Preparations:
+    ; S = $7FFF.
+    ; Interrupts disabled.
+    ; All registers set to 16-bit width, but otherwise undefined.
+    ; RAM-based exception vectors initialized.  See resetCpuVectorTable.
+
+L1:
+    lda $fe0000
+    inc
+    sta $fe0000
+    jmp L1
+.endproc
+
