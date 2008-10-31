@@ -167,3 +167,55 @@ L2: bne L1          ; invariant: Y /= 0
     rts
 .endproc
 
+.export _cursorRight
+.proc _cursorRight
+    ; Pre-conditions:
+    ;   left <= cx < right
+    ;   top <= cy < bottom
+    ;   S = [kScroll]
+    ;
+    ; normal post-conditions:
+    ;   left <= cx < right
+    ;   top <= cx < bottom
+    ;   S = [kScroll]
+    ;
+    ; scrolling post-conditions:
+    ;   left <= cx < right
+    ;   top <= cx < bottom
+    ;   S = []
+    ;   Note the stack is _empty_ -- the caller must return to its normal
+    ;   flow of control via a branch, not an RTS.
+
+    pha                     ; S = [A, kCaller, kScroll]
+    lda cx
+    inc
+    cmp right
+    bcs cx_1_ge_right       ; (cx+1) >= right
+                            ; (cx+1) < right
+    sta cx                  ; cx = old cx + 1; left <= cx < right
+    pla                     ; S = [kCaller, kScroll]
+    rts
+
+cx_1_ge_right:              ; S = [A, kCaller, kScroll], (cx+1) >= right
+    lda left
+    sta cx                  ; cx = left; left <= cx < right
+
+    lda cy
+    inc
+    cmp bottom
+    bcs cy_1_ge_bottom      ; (cy+1) >= bottom
+                            ; (cy+1) < bottom
+    sta cy                  ; cy = old cy + 1
+    ; cx = left
+    ; top <= cy < bottom
+    pla                     ; S = [kCaller, kScroll]
+    rts
+
+cy_1_ge_bottom:             ; S = [A, kCaller, kScroll], cx = left; (cy+1) = bottom
+    lda 1,s
+    sta 3,s                 ; S = [A, A, kScroll]
+    pla                     ; S = [A, kScroll]
+    pla                     ; S = [kScroll]
+    rts
+.endproc
+
