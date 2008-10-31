@@ -179,6 +179,9 @@ L2: bne L1          ; invariant: Y /= 0
     ;   top <= cx < bottom
     ;   S = [kScroll]
     ;
+    ;   Note the stack still retains the continuation for scrolling; the
+    ;   caller must clean the stack of this unused parameter.
+    ;
     ; scrolling post-conditions:
     ;   left <= cx < right
     ;   top <= cx < bottom
