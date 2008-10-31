@@ -222,3 +222,48 @@ cy_1_ge_bottom:             ; S = [A, kCaller, kScroll], cx = left; (cy+1) = bot
     rts
 .endproc
 
+.export _cursorReturn
+.proc _cursorReturn
+    ; preconditions:
+    ;   top <= cy < bottom
+    ;   S = [kScroll]
+    ;
+    ; normal post conditions:
+    ;   cx = left
+    ;   top <= cy < bottom
+    ;   old cy <= cy <= old cy+1
+    ;   S = [kScroll]
+
+    ; S = [kNormal, kScroll]
+    pha
+    ; S = [A, kNormal, kScroll]
+
+    lda left
+    sta cx
+    ; cx = left
+
+    ; top <= cy < bottom
+    lda cy
+    inc
+    cmp bottom
+    bcs cy_1_ge_bottom  ; (cy+1) >= bottom
+    sta cy
+    ; old cy <= cy <= old cy+1
+    ; top <= cy < bottom
+    pla
+    rts
+
+cy_1_ge_bottom:
+    ; S = [A, kNormal, kScroll]
+    ; top <= cy < bottom
+    ; cy+1 = bottom
+    lda 1,s
+    sta 3,s
+    pla
+    pla
+    ; top <= cy < bottom
+    ; old cy <= cy <= old cy + 1
+    ; S = [kScroll]
+    rts
+.endproc
+

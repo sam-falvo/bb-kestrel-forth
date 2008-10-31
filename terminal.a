@@ -51,6 +51,12 @@ L1: ply
     rts
 
 scrollingIfNecessary:
+    jsr verticalScroll
+    jmp L1
+.endproc
+
+.proc verticalScroll
+    ; DESTROYS ALL REGISTERS
     lda #37760              ; scroll the entire bitmap up.
     ldx #640                ; should be migrated into graphics.a
     ldy #0
@@ -62,11 +68,11 @@ scrollingIfNecessary:
     ldy #37761
     lda #640
     mvn $FE, $FE
-
-    bra L1    
+    rts
 .endproc
 
 .export _carriageReturn
+.import _cursorReturn
 .proc _carriageReturn
     ; Preconditions
     ;   Framebuffer established using _wide, _setFramebuffer, et. al.
@@ -76,6 +82,24 @@ scrollingIfNecessary:
     ; Postconditions:
     ;   Cursor flush left.
 
+    phb
+    pha
+    phx
+    phy
+    pea L1-1
+    jsr _cursorReturn
+    ply
+    ply
+    plx
+    pla
+    plb
+    rts
+
+L1: jsr verticalScroll
+    ply
+    plx
+    pla
+    plb
     rts
 .endproc
 

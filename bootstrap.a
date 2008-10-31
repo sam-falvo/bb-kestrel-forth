@@ -64,8 +64,17 @@ romFont:
     lda #0
 L1: jsr _typeCharacter
     inc
-    bne L1
+    cmp #1117
+    bcc L1
     jsr _carriageReturn
+    jsr _carriageReturn
+    jsr _carriageReturn
+    jsr _carriageReturn
+    jsr _carriageReturn
+    jsr _carriageReturn
+    jsr _carriageReturn
+    jsr _carriageReturn
+    lda #0
     jmp L1
 .endproc
 
