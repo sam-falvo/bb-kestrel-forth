@@ -62,7 +62,7 @@ _width:     .res 2
     phy
     phd
 
-    ; { S := [D, Y, X, A] }
+    ; S = [D, Y, X, A]
 
     lda _frame+2
     pha
@@ -78,7 +78,7 @@ _width:     .res 2
     adc 3,s
     sta 3,s
 
-    ; { S = [p, D, Y, X, A] }
+    ; S = [p, D, Y, X, A]
 
     lda _font+2
     pha
@@ -90,7 +90,7 @@ _width:     .res 2
     tsc
     tcd
 
-    ; { S := [g, p, D, Y, X, A ] }
+    ; S = [g, p, D, Y, X, A ]
 
 p   =   5       ; bitmap pointer
 g   =   1       ; glyph pointer
@@ -98,45 +98,39 @@ g   =   1       ; glyph pointer
     ldx #8
     ldy #0
 
-L1: ; invariant: { X /= 0 }
-    ;   { y = 0 }
-    ;   { _font <= g < (_font + 2048) }
-    ;   { _frame <= p < (_frame + size of bitmap) }
+L1: ; invariant: X >= 1
+    ;   y = 0
+    ;   _font <= g < (_font + 2048)
+    ;   _frame <= p < (_frame + size of bitmap)
 
-    AX8
+    A8
     lda [g],y
     sta [p],y
-    AX16
+    A16
 
-    ;   { (X-1 /= 0) = ((g + 256) < (_font + 2048)) }
-
+    ;   ((X-1 > 0) & (g+256 < (_font + 2048))) | ((X-1 = 0) & (g+256 >= (_font + 2048)))
     inc g+1
+    ;   ((X-1 > 0) & (g < (_font + 2048))) | ((X-1 = 0) & (g >= (_font + 2048)))
 
-    ;   { (X-1 /= 0) = (g < (_font + 2048)) }
-    ;   { (p + _width) < (_frame + size of bitmap) }
-
+    ;   (p + _width) < (_frame + size of bitmap)
     clc
     lda _width
     adc p
     sta p
+    ;   p < (_frame + size of bitmap)
 
-    ;   { p < (_frame + size of bitmap) }
-    ;   { (X-1 /= 0) = (g < (_font + 2048)) }
-
-    dex
-
-    ;   { (X /= 0) = (g < (_font + 2048)) }
-
+    ;   ((X-1 > 0) & (g < (_font + 2048))) | ((X-1 = 0) & (g >= (_font + 2048)))
+    dex 
+    ;   ((X > 0) & (g < (_font + 2048))) | ((X = 0) & (g >= (_font + 2048)))
     bne L1
+    ; X = 0 & g >= (_font + 2048) & S = [g, p, D, Y, X, A]
 
-    ; { X = 0 && g >= (_font + 2048) && S := [g, p, D, Y, X, A] }
-
+    ; S = [g, p, D, Y, X, A]
     tsc
     clc
     adc #8
     tcs
-
-    ; { S := [D, Y, X, A] }
+    ; S = [D, Y, X, A]
 
     pld
     ply
