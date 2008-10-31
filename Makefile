@@ -1,7 +1,8 @@
 MODULES =	bootstrap			\
 			cpu-vectors			\
 			graphics			\
-			cursor
+			cursor				\
+			terminal
 
 .SUFFIXES: .a .o
 
@@ -26,4 +27,5 @@ ROMFILE: $(MODULES:%=build/%.o)
 
 clean:
 	rm -f *.o *.lst ROMFILE a.out symbolmap
+	rm -rf build
 

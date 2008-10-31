@@ -23,6 +23,7 @@ romFont:
 .import _setWindowExtent
 .import _setXY
 .import _cursorRight
+.import _typeCharacter
 .proc __n_reset
     ;; This is the native-mode cold-boot entry point.  This procedure
     ;; never returns.
@@ -60,30 +61,11 @@ romFont:
 
 
     lda #0
-L1: jsr _plotGlyph
-    pea L3-1
-    jsr _cursorRight
-    ply
-;    ldx #0
-;    ldy #1
-;L2: dex
-;    bne L2
-;    dey
-;    bne L2
-L4: inc
-    and #255
+L1: jsr _typeCharacter
+    inc
+    bne L1
+    jsr _carriageReturn
     jmp L1
-
-L3: pha
-    ldx #640        ; invoked only when scrolling becomes necessary
-    ldy #0
-    lda #37760
-    mvn $FE,$FE
-    pea 0
-    plb
-    plb
-    pla
-    jmp L4
 .endproc
 
 
