@@ -1,0 +1,92 @@
+    .p816
+    .a16
+    .i16
+
+
+    .include "hw/cpu.inc"
+
+
+    .bss
+
+_font:      .res 4
+    ; pointer to a 2048x8 pixel bitmap containing the font to draw with.
+    ; All glyphs are 8x8 pixels in size.
+
+_frame:     .res 4
+    ; pointer to the current bitmap.
+
+_width:     .res 2
+    ; The current character width of the bitmap.
+
+
+    .code
+
+.export _useFramebuffer
+.proc _useFramebuffer
+    sta _frame
+    sty _frame+2
+    rts
+.endproc
+
+.export _useFont
+.proc _useFont
+    sta _font
+    sty _font+2
+    rts
+.endproc
+
+.export _wide
+.proc _wide
+    sta _width
+    rts
+.endproc
+
+.export _plotGlyph
+.proc _plotGlyph
+    pha
+    phx
+    phy
+    phd
+
+    lda _frame+2
+    pha
+    lda _frame
+    pha
+    lda _font+2
+    pha
+    lda _font
+    clc
+    adc #65
+    pha
+    tsc
+    tcd
+
+p   =   5       ; bitmap pointer
+g   =   1       ; glyph pointer
+
+    ldx #8
+    ldy #0
+L1: AX8
+    lda [g],y
+    sta [p],y
+    AX16
+    inc g+1
+    clc
+    lda _width
+    adc p
+    sta p
+    dex
+    bne L1
+
+    tsc
+    clc
+    adc #8
+    tcs
+
+    pld
+    ply
+    plx
+    pla
+    rts
+.endproc
+

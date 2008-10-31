@@ -1,16 +1,21 @@
-MODULES = 	bootstrap			\
-			cpu-vectors
+MODULES =	bootstrap			\
+			cpu-vectors			\
+			graphics
 
 .SUFFIXES: .a .o
 
 .a.o:
 	ca65 -Iinclude -l $<
 
-all: ROMFILE
+all: builddir ROMFILE
 
-ROMFILE: $(MODULES:%=%.o)
+builddir:
+	mkdir -p build
+	cp $(MODULES:%=%.a) build
+
+ROMFILE: $(MODULES:%=build/%.o)
 	ld65 -m symbolmap --config ./ld65.config \
-		$(MODULES:%=%.o)
+		$(MODULES:%=build/%.o)
 
 
 #ROMFILE: $(MODULES:%=%.o) $(UNITTESTS:%=%_unittest.o)

@@ -6,9 +6,18 @@
     .include "hw/chipset.inc"
 
 
+    .rodata
+romFont:
+    .incbin "font.bin"
+
+
     .code
 
 .export __n_reset
+.import _wide
+.import _useFramebuffer
+.import _useFont
+.import _plotGlyph
 .proc __n_reset
     ;; This is the native-mode cold-boot entry point.  This procedure
     ;; never returns.
@@ -24,11 +33,17 @@
     jsr initializeIRQ
     cli
 
-L1:
-    lda $fe0000
-    inc
-    sta $fe0000
-    jmp L1
+    lda #80
+    jsr _wide
+    lda #0
+    ldy #$FE
+    jsr _useFramebuffer
+    lda #romFont
+    ldy #0
+    jsr _useFont
+
+    jsr _plotGlyph
+    bra *
 .endproc
 
 
