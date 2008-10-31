@@ -103,10 +103,10 @@ L1: ; invariant: X >= 1
     ;   _font <= g < (_font + 2048)
     ;   _frame <= p < (_frame + size of bitmap)
 
-    A8
+    AX8
     lda [g],y
     sta [p],y
-    A16
+    AX16
 
     ;   ((X-1 > 0) & (g+256 < (_font + 2048))) | ((X-1 = 0) & (g+256 >= (_font + 2048)))
     inc g+1
