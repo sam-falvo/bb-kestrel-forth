@@ -43,45 +43,80 @@ _width:     .res 2
 
 .export _plotGlyph
 .proc _plotGlyph
+    ; Preconditions:
+    ;   0 <= A < 256
+    ;   _frame points to a valid framebuffer or suitably sized bitmap.
+    ;   _font points to a 2048 x 8 bitmap containing character glyphs.
+
     pha
     phx
     phy
     phd
 
+    ; { S := [D, Y, X, A] }
+
     lda _frame+2
     pha
     lda _frame
     pha
+
     lda _font+2
     pha
     lda _font
     clc
-    adc #65
+    adc 13,s    ; use character specified in A on entry
     pha
+
     tsc
     tcd
+
+    ; { S := [g, p, D, Y, X, A ] }
 
 p   =   5       ; bitmap pointer
 g   =   1       ; glyph pointer
 
     ldx #8
     ldy #0
-L1: AX8
+
+L1: ; invariant: { X /= 0 }
+    ;   { y = 0 }
+    ;   { _font <= g < (_font + 2048) }
+    ;   { _frame <= p < (_frame + size of bitmap) }
+
+    AX8
     lda [g],y
     sta [p],y
     AX16
+
+    ;   { (X-1 /= 0) = ((g + 256) < (_font + 2048)) }
+
     inc g+1
+
+    ;   { (X-1 /= 0) = (g < (_font + 2048)) }
+    ;   { (p + _width) < (_frame + size of bitmap) }
+
     clc
     lda _width
     adc p
     sta p
+
+    ;   { p < (_frame + size of bitmap) }
+    ;   { (X-1 /= 0) = (g < (_font + 2048)) }
+
     dex
+
+    ;   { (X /= 0) = (g < (_font + 2048)) }
+
     bne L1
+
+    ; { X = 0 && g >= (_font + 2048) && S := [g, p, D, Y, X, A] }
 
     tsc
     clc
     adc #8
     tcs
+
+    ; { S := [D, Y, X, A] }
 
     pld
     ply

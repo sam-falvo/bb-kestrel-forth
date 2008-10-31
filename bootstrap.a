@@ -42,8 +42,16 @@ romFont:
     ldy #0
     jsr _useFont
 
-    jsr _plotGlyph
-    bra *
+    lda #0
+L1: jsr _plotGlyph
+    ldx #0
+    ldy #10
+L2: dex
+    bne L2
+    dey
+    bne L2
+    inc
+    jmp L1
 .endproc
 
 
