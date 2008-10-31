@@ -17,10 +17,90 @@
     ; All registers set to 16-bit width, but otherwise undefined.
     ; RAM-based exception vectors initialized.  See resetCpuVectorTable.
 
+    jsr initializeMGIA
+    jsr initializeIRQ
+    cli
+
 L1:
     lda $fe0000
     inc
     sta $fe0000
     jmp L1
+.endproc
+
+
+.proc initializeMGIA
+    ;; Initializes the Monochrome Graphics Interface Adapter.
+    ;; The MGIA was originally specified for implementation in an
+    ;; FPGA; hence, programming the emulator's version of it resembles
+    ;; a more traditional video chip.  In reality, it remains to be seen
+    ;; if an FPGA will provide the functionality, or if a SEAforth chip
+    ;; will.  If the latter, this code will change markedly.
+
+    lda #800                ; Set CRTC for VGA monitor, 60Hz refresh
+    sta CCHZTL
+    lda #525
+    sta CCVRTL
+    lda #$025F
+    sta CCSYWD
+
+    lda #140                ; Set display to center of the display
+    sta VIHZST              ; (hopefully)
+    lda #780
+    sta VIHZEN
+    lda #34
+    sta VIVRST
+    lda #514
+    sta VIVREN
+
+    inc                     ; Set raster line for display interrupt
+    sta CCVRLI
+    rts
+.endproc
+
+
+.import nativeModeIRQVector
+.proc initializeIRQ
+    lda #globalIrqHandler
+    sta nativeModeIRQVector
+
+    lda #0
+    sta IQPN
+    lda #IQVRLI
+    sta IQEA
+    rts
+
+globalIrqHandler:
+    php
+    AX16
+    pha
+    phx
+    phy
+
+    jsr processPendingMgiaInterrupt
+
+    ply
+    plx
+    pla
+    plp
+    rti
+.endproc
+
+
+.proc processPendingMgiaInterrupt
+    lda IQPN
+    bit #IQVRLI
+    beq noPendingInterrupt
+
+    and #~IQVRLI
+    sta IQPN
+
+    lda #$0000
+    sta VIDAPTL
+    lda #$00FE
+    sta VIDAPTH
+
+noPendingInterrupt:
+    rts
 .endproc
 
