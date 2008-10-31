@@ -1,0 +1,81 @@
+    .p816
+    .a16
+    .i16
+
+
+;
+; Emulates a dumb teletype.
+;
+; Footnote:
+; It amazes me that we are still emulating -teletypes-.  Commodore has gone
+; the furthest in advancing the state of the art in textual user interfaces
+; by implementing a crude text editor as their basic UI.  At some point in
+; the future, I will revisit this idea; it's what I strove for in the orig-
+; inal Kestrel-2 ROMs, but never fully realized.
+;
+; Some day...
+;
+
+
+    .code
+
+.export _typeCharacter
+.import _plotGlyph
+.import _cursorRight
+.proc _typeCharacter
+    ; Preconditions:
+    ;   A[7:0] = character to plot
+    ;   A[15:8] ignored.
+    ;
+    ;   Framebuffer established using _wide, _setFramebuffer, et. al.
+    ;   Cursor window established: see _setWindowOrigin, _setWindowExtent.
+    ;   Cursor position previously established; see _setXY.
+    ;
+    ; Post-conditions:
+    ;   A, X, Y unchanged.
+    ;   Character displayed.  Screen scrolled if appropriate.
+
+    phb
+    pha
+    phx
+    phy
+    and #$00FF
+    jsr _plotGlyph
+    pea scrollingIfNecessary-1
+    jsr _cursorRight
+    ply
+L1: ply
+    plx
+    pla
+    plb
+    rts
+
+scrollingIfNecessary:
+    lda #37760              ; scroll the entire bitmap up.
+    ldx #640                ; should be migrated into graphics.a
+    ldy #0
+    mvn $FE, $FE
+
+    ldx #37760              ; Clear bottom line of the screen
+    lda #0                  ; should also be in graphics.a
+    sta 0,x
+    ldy #37761
+    lda #640
+    mvn $FE, $FE
+
+    bra L1    
+.endproc
+
+.export _carriageReturn
+.proc _carriageReturn
+    ; Preconditions
+    ;   Framebuffer established using _wide, _setFramebuffer, et. al.
+    ;   Cursor window established: see _setWindowOrigin, _setWindowExtent.
+    ;   Cursor position previously established; see _setXY.
+    ;
+    ; Postconditions:
+    ;   Cursor flush left.
+
+    rts
+.endproc
+

@@ -24,6 +24,7 @@ romFont:
 .import _setXY
 .import _cursorRight
 .import _typeCharacter
+.import _carriageReturn
 .proc __n_reset
     ;; This is the native-mode cold-boot entry point.  This procedure
     ;; never returns.
