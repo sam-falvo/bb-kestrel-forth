@@ -1,0 +1,169 @@
+    .p816
+    .a16
+    .i16
+
+;
+; Keeps track of the current cursor position on some text-capable surface or
+; output device.
+;
+
+
+    .bss
+
+    ; The current (x,y) cursor position.
+cx:     .res 2      ; invariant: left <= x < right
+cy:     .res 2      ; invariant: top <= y < bottom
+
+    ; The character boundaries within which (cx,cy) may reside.
+    ; Often called the "window."
+left:   .res 2
+top:    .res 2
+right:  .res 2      ; invariant: right >= left
+bottom: .res 2      ; invariant: bottom >= top
+
+
+    .code
+
+.export _setWindowOrigin
+.proc _setWindowOrigin
+    ; Preconditions:
+    ;   A <= character width of target bitmap
+    ;   Y <= character height of target bitmap
+
+    sta left
+    sty top
+
+    ; { A, Y free. }
+
+    jmp _constrain
+.endproc
+
+.export _setWindowExtent
+.proc _setWindowExtent
+    ; Preconditions:
+    ;   left <= A <= character width of target bitmap
+    ;   top <= Y <= character height of target bitmap
+
+    sta right
+    sty bottom
+
+    ; { A, Y free. }
+    ; Falls through to _constrain
+.endproc
+    ;
+    ; _constrain MUST follow _setWindowExtent
+    ;
+.proc _constrain
+    ; Preconditions:
+    ;   0 <= left <= right
+    ;   0 <= top <= bottom
+    ;
+    ; Postconditions:
+    ;   0 <= left <= cx < right
+    ;   0 <= top <= cy < bottom
+
+    pha
+
+    lda right
+    dec
+    cmp cx
+    bcs cx_lt_right     ; right-1 >= cx
+    sta cx
+    ; cx = right-1
+
+cx_lt_right:
+    ; cx < right
+
+    lda cx
+    cmp left
+    bcs cx_ge_left      ; cx >= left
+    lda left
+    sta cx
+    ; cx = left
+
+cx_ge_left:
+    ; left <= cx < right
+
+    lda bottom
+    dec
+    cmp cy
+    bcs cy_le_bottom    ; bottom-1 >= cy
+    sta cy
+    ; cy = bottom-1
+
+cy_le_bottom:
+    ; cy < bottom
+
+    lda cy
+    cmp top
+    bcs cy_ge_top       ; cy >= top
+    lda top
+    sta cy
+    ; cy = top
+
+cy_ge_top:
+    ; top <= cy < bottom
+    ; left <= cx < right
+
+    pla
+    rts
+.endproc
+
+.export _setXY
+.proc _setXY
+    ; Post-conditions:
+    ;   left <= cx < right
+    ;   top <= cy < bottom
+
+    sta cx
+    sty cy
+    jmp _constrain
+.endproc
+
+.export _cursorOffsetInBitmap
+.proc _cursorOffsetInBitmap
+    ; Pre-conditions:
+    ;   A = bitmap width in bytes
+    ;   0 <= left <= cx < right <= A
+    ;   0 <= top <= cy < bottom < (bitmap height / 8)
+    ;   size of bitmap < 65536
+    ;
+    ; post-conditions:
+    ;   A = offset into bitmap corresponding to character position (cx,cy)
+    ;   0 <= A < size of bitmap
+    ;
+    ; Note: I'm using a slow, but effective method for multiplication by
+    ; repeated sums.  Since I do not anticipate a Y coordinate in excess
+    ; of 59 very often, I think this is a reasonable tradeoff to make between
+    ; getting the software out the door soon versus producing correct
+    ; software.
+
+    phy             ; S = [Y]
+    pha             ; S = [width, Y]
+
+    ; 8*(cy * width) + cx < bitmap size
+
+    lda #0          ; offset = 0
+    ldy cy          ; Y >= 0
+    bra L2
+L1: clc             ; Y >= 1
+    adc 1,s         ; offset = n*width, 0 <= n < cy
+    dey             ; Y >= 0
+L2: bne L1          ; invariant: Y /= 0
+    ; Y = 0
+    ; offset = cy * width, 8*offset < bitmap size
+    asl
+    asl
+    asl
+    ; offset = 8*(cy * width), offset < bitmap size
+    ; offset + cx < bitmap size
+    clc
+    adc cx
+    ; offset = 8*(width * cy) + cx, offset < bitmap size
+
+                    ; S = [width, Y]
+    ply             ; S = [Y]
+    ply
+    rts
+.endproc
+
