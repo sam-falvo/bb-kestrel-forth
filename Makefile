@@ -1,6 +1,7 @@
 MODULES =	bootstrap			\
 			cpu-vectors			\
-			graphics
+			graphics			\
+			cursor
 
 .SUFFIXES: .a .o
 

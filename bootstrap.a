@@ -7,6 +7,7 @@
 
 
     .rodata
+
 romFont:
     .incbin "font.bin"
 
@@ -18,6 +19,9 @@ romFont:
 .import _useFramebuffer
 .import _useFont
 .import _plotGlyph
+.import _setWindowOrigin
+.import _setWindowExtent
+.import _setXY
 .proc __n_reset
     ;; This is the native-mode cold-boot entry point.  This procedure
     ;; never returns.
@@ -35,21 +39,34 @@ romFont:
 
     lda #80
     jsr _wide
+
     lda #0
     ldy #$FE
     jsr _useFramebuffer
+
     lda #romFont
     ldy #0
     jsr _useFont
 
     lda #0
-L1: jsr _plotGlyph
-    ldx #0
-    ldy #10
-L2: dex
-    bne L2
-    dey
-    bne L2
+    tay
+    jsr _setWindowOrigin
+
+    lda #80
+    ldy #60
+    jsr _setWindowExtent
+
+
+    lda #0
+L1: tay
+    jsr _setXY
+    jsr _plotGlyph
+;    ldx #0
+;    ldy #1
+;L2: dex
+;    bne L2
+;    dey
+;    bne L2
     inc
     jmp L1
 .endproc

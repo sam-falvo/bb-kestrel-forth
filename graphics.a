@@ -6,6 +6,14 @@
     .include "hw/cpu.inc"
 
 
+;
+; A collection of procedures for rendering to a graphics bitmap.  Since we're
+; working with a pretty stupid and minimal Forth environment, this module's
+; name is perhaps misleading, as we're primarily concerned with textual output
+; to the screen.
+;
+
+
     .bss
 
 _font:      .res 4
@@ -42,6 +50,7 @@ _width:     .res 2
 .endproc
 
 .export _plotGlyph
+.import _cursorOffsetInBitmap
 .proc _plotGlyph
     ; Preconditions:
     ;   0 <= A < 256
@@ -59,6 +68,17 @@ _width:     .res 2
     pha
     lda _frame
     pha
+
+    lda _width
+    jsr _cursorOffsetInBitmap
+    clc
+    adc 1,s
+    sta 1,s
+    lda #0
+    adc 3,s
+    sta 3,s
+
+    ; { S = [p, D, Y, X, A] }
 
     lda _font+2
     pha
