@@ -156,6 +156,16 @@ moveAnotherByte:
     ;;; When the CPU is reset, this is where the CPU starts executing
     ;;; instructions.  Note that the CPU is in 8-bit 6502 mode when
     ;;; control reaches here via the RESET vector.
+    ;
+    ; post-conditions:
+    ;   CPU in native mode
+    ;   All registers in 16-bit mode
+    ;   S = $7FFF
+    ;   X = $00FE
+    ;   D = $0000
+    ;   Interrupts disabled
+    ;   RAM-resident CPU vector table (re-)initialized to ROM defaults
+    ;   See __n_reset for further bootstrapping behavior.
 
     M65816
     AX16
