@@ -4,7 +4,6 @@
 
     .include "hw/cpu.inc"
     .include "hw/chipset.inc"
-    .include "vm.inc"
 
 
     .code
