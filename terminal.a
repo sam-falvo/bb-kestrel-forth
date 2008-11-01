@@ -36,18 +36,18 @@ cy:     .res 2      ; invariant: 0 <= y < bottom
 hidden: .res 2      ; invariant: 0 <= hidden <= 65535
 
     ; Non-zero if the cursor is physically rendered to the screen.
+    ; This is distinct from the cursor hiddenness, because the cursor
+    ; may be visible but not drawn at the current moment (it's a
+    ; blinking cursor).
 cursorIsDrawn: .res 2
 
 
 RIGHT   = 80
 BOTTOM  = 60
 
-_font:  .res 4
     ; pointer to a 2048x8 pixel bitmap containing the font to draw with.
     ; All glyphs are 8x8 pixels in size.
-
-_frame: .res 4
-    ; pointer to the current bitmap.
+_font:  .res 4
 
 
     .code
@@ -61,9 +61,6 @@ _frame: .res 4
     lda #romFont
     sta _font
     stz _font+2
-    stz _frame
-    lda #$FE
-    sta _frame+2
     pla
     rts
 .endproc
@@ -278,7 +275,6 @@ cy_1_ge_bottom:
 .proc plotGlyph
     ; Preconditions:
     ;   0 <= A < 256; A = character to display
-    ;   _frame points to a valid framebuffer or suitably sized bitmap.
     ;   _font points to a 2048 x 8 bitmap containing character glyphs.
 
     pha
@@ -288,18 +284,9 @@ cy_1_ge_bottom:
 
     ; S = [D, Y, X, A]
 
-    lda _frame+2
-    pha
-    lda _frame
-    pha
-
+    pea $00FE
     jsr cursorOffsetInBitmap
-    clc
-    adc 1,s
-    sta 1,s
-    lda #0
-    adc 3,s
-    sta 3,s
+    pha
 
     ; S = [p, D, Y, X, A]
 
@@ -507,18 +494,11 @@ _noop:
     phd
     ; S = [D,Y,X,A]
 
-    lda _frame+2
-    pha
-    lda _frame
-    pha
-
+    pea $00FE
     jsr cursorOffsetInBitmap
-    clc
-    adc 1,s
-    sta 1,s
-    lda 3,s
-    adc #0
-    sta 3,s
+    pha
+    ; S = [p,D,Y,X,A]
+
     tsc
     tcd
 
