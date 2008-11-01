@@ -1,7 +1,5 @@
 MODULES =	bootstrap			\
 			cpu-vectors			\
-			graphics			\
-			cursor				\
 			terminal
 
 .SUFFIXES: .a .o

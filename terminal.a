@@ -3,6 +3,9 @@
     .i16
 
 
+    .include "hw/cpu.inc"
+
+
 ;
 ; Emulates a dumb teletype.
 ;
@@ -17,12 +20,51 @@
 ;
 
 
+    .rodata
+
+romFont:
+    .incbin "font.bin"
+
+
+    .bss
+
+    ; The current (x,y) cursor position.
+cx:     .res 2      ; invariant: 0 <= x < right
+cy:     .res 2      ; invariant: 0 <= y < bottom
+
+RIGHT   = 80
+BOTTOM  = 60
+
+_font:  .res 4
+    ; pointer to a 2048x8 pixel bitmap containing the font to draw with.
+    ; All glyphs are 8x8 pixels in size.
+
+_frame: .res 4
+    ; pointer to the current bitmap.
+
+
     .code
 
-.export _typeCharacter
-.import _plotGlyph
-.import _cursorRight
-.proc _typeCharacter
+.export tioInitialize
+.proc tioInitialize
+    pha
+    stz cx
+    stz cy
+    lda #romFont
+    sta _font
+    stz _font+2
+    stz _frame
+    lda #$FE
+    sta _frame+2
+    pla
+    rts
+.endproc
+
+
+.export tioTypeCharacter
+.proc tioTypeCharacter
+    ; Prints a single character to the screen.
+    ;
     ; Preconditions:
     ;   A[7:0] = character to plot
     ;   A[15:8] ignored.
@@ -35,28 +77,185 @@
     ;   A, X, Y unchanged.
     ;   Character displayed.  Screen scrolled if appropriate.
 
+    pha
+    and #$00FF
+    jsr plotGlyph
+    jsr tioCursorRight
+    pla
+    rts
+.endproc
+
+.export tioSetXY
+.proc tioSetXY
+    ; Pre-conditions:
+    ;   A = column
+    ;   Y = row
+    ;
+    ; Post-conditions:
+    ;   0 <= cx < right
+    ;   0 <= cy < bottom
+
+    sta cx
+    sty cy
+.endproc
+    ; tioSetXY falls through to tioConstrainCursor
+.proc tioConstrainCursor
+    ; Enforces the invariant that a cursor must always fit on the screen.
+    ;
+    ; Postconditions:
+    ;   0 <= cx < right
+    ;   0 <= cy < bottom
+
+    pha
+
+    lda #RIGHT-1
+    cmp cx
+    bcs cx_lt_right     ; right-1 >= cx
+    sta cx
+    ; cx = right-1
+
+cx_lt_right:
+    ; cx <= right-1
+    ; cx < right
+    ; 0 <= cx < right
+
+    lda #BOTTOM-1
+    cmp cy
+    bcs cy_le_bottom    ; bottom-1 >= cy
+    sta cy
+    ; cy = bottom-1
+
+cy_le_bottom:
+    ; cy <= bottom-1
+    ; cy < bottom
+    ; 0 <= cy < bottom
+
+    pla
+    rts
+.endproc
+
+.proc cursorOffsetInBitmap
+    ; Pre-conditions:
+    ;   0 <= cx < right
+    ;   0 <= cy < bottom
+    ;   bitmap size < 65536 bytes
+    ;
+    ; post-conditions:
+    ;   A = offset into bitmap corresponding to character position (cx,cy)
+    ;   0 <= A < size of bitmap
+    ;
+    ; Note: I'm using a slow, but effective method for multiplication by
+    ; repeated sums.  Since I do not anticipate a Y coordinate in excess
+    ; of 59 very often, I think this is a reasonable tradeoff to make between
+    ; getting the software out the door soon versus producing correct
+    ; software.
+
+    phy             ; S = [Y]
+
+    ; 8*(cy * width) + cx < bitmap size
+
+    lda #0          ; offset = 0
+    ldy cy          ; Y >= 0
+    bra L2
+L1: clc             ; Y >= 1
+    adc #640        ; offset = 8*n*width, 0 <= n < cy
+    dey             ; Y >= 0
+L2: bne L1          ; invariant: Y /= 0
+    ; Y = 0
+    ; offset = 8*(cy * width), offset < bitmap size
+    ; offset + cx < bitmap size
+    clc
+    adc cx
+    ; offset = 8*(width * cy) + cx, offset < bitmap size
+
+    ply             ; S = []
+    rts
+.endproc
+
+.export tioCursorRight
+.proc tioCursorRight
+    ; Pre-conditions:
+    ;   0 <= cx < right
+    ;   0 <= cy < bottom
+    ;
+    ; post-conditions:
+    ;   0 <= cx < right
+    ;   0 <= cx < bottom
+
+    pha                     ; S = [A]
+    lda cx
+    inc
+    cmp #RIGHT
+    bcs cx_1_ge_right       ; (cx+1) >= right
+                            ; (cx+1) < right
+    sta cx                  ; cx = old cx + 1; 0 <= cx < right
+    pla                     ; S = []
+    rts
+
+cx_1_ge_right:              ; S = [A], (cx+1) >= right
+    stz cx                  ; cx = 0; 0 <= cx < right
+    pla                     ; S = []
+    jmp tioCursorDown
+.endproc
+
+.export tioCarriageReturn
+.proc tioCarriageReturn
+    ; pre-conditions:
+    ;   0 <= cy < bottom
+    ;
+    ; post-conditions:
+    ;   cx = left
+    ;   0 <= cy < bottom
+    ;   old cy <= cy <= old cy+1
+
+    ; S = []
+    pha
+    ; S = [A]
+
+    stz cx
+    ; cx = left, S = [A]
+    pla
+    ; S = []
+.endproc
+    ; fall through
+.export tioCursorDown
+.proc tioCursorDown
+    ; pre-conditions:
+    ;   0 <= cy < bottom
+    ;
+    ; post-conditions:
+    ;   0 <= old cy <= cy <= old cy + 1 < bottom
+
+    ; S = []
+    pha
+    ; S = [A]
+
+    ; 0 <= cy < bottom
+    lda cy
+    inc
+    cmp #BOTTOM
+    bcs cy_1_ge_bottom  ; (cy+1) >= bottom
+    sta cy
+    ; old cy <= cy <= old cy+1
+    ; 0 <= cy < bottom
+    pla
+    ; S = []
+    rts
+
+cy_1_ge_bottom:
+    ; S = [A]
+    ; 0 <= cy < bottom
+    ; cy+1 = bottom
+    pla
+    ; S = []
+.endproc
+    ; fall through again!
+.proc verticalScroll
     phb
     pha
     phx
     phy
-    and #$00FF
-    jsr _plotGlyph
-    pea scrollingIfNecessary-1
-    jsr _cursorRight
-    ply
-L1: ply
-    plx
-    pla
-    plb
-    rts
 
-scrollingIfNecessary:
-    jsr verticalScroll
-    jmp L1
-.endproc
-
-.proc verticalScroll
-    ; DESTROYS ALL REGISTERS
     lda #37760              ; scroll the entire bitmap up.
     ldx #640                ; should be migrated into graphics.a
     ldy #0
@@ -68,38 +267,98 @@ scrollingIfNecessary:
     ldy #37761
     lda #640
     mvn $FE, $FE
+
+    ply
+    plx
+    pla
+    plb
     rts
 .endproc
 
-.export _carriageReturn
-.import _cursorReturn
-.proc _carriageReturn
-    ; Preconditions
-    ;   Framebuffer established using _wide, _setFramebuffer, et. al.
-    ;   Cursor window established: see _setWindowOrigin, _setWindowExtent.
-    ;   Cursor position previously established; see _setXY.
-    ;
-    ; Postconditions:
-    ;   Cursor flush left.
+.proc plotGlyph
+    ; Preconditions:
+    ;   0 <= A < 256; A = character to display
+    ;   _frame points to a valid framebuffer or suitably sized bitmap.
+    ;   _font points to a 2048 x 8 bitmap containing character glyphs.
 
-    phb
     pha
     phx
     phy
-    pea L1-1
-    jsr _cursorReturn
-    ply
-    ply
-    plx
-    pla
-    plb
-    rts
+    phd
 
-L1: jsr verticalScroll
+    ; S = [D, Y, X, A]
+
+    lda _frame+2
+    pha
+    lda _frame
+    pha
+
+    jsr cursorOffsetInBitmap
+    clc
+    adc 1,s
+    sta 1,s
+    lda #0
+    adc 3,s
+    sta 3,s
+
+    ; S = [p, D, Y, X, A]
+
+    lda _font+2
+    pha
+    lda _font
+    clc
+    adc 13,s    ; use character specified in A on entry
+    pha
+
+    tsc
+    tcd
+
+    ; S = [g, p, D, Y, X, A ]
+
+p   =   5       ; bitmap pointer
+g   =   1       ; glyph pointer
+
+    ldx #8
+    ldy #0
+
+L1: ; invariant: X >= 1
+    ;   y = 0
+    ;   _font <= g < (_font + 2048)
+    ;   _frame <= p < (_frame + size of bitmap)
+
+    AX8
+    lda [g],y
+    sta [p],y
+    AX16
+
+    ;   ((X-1 > 0) & (g+256 < (_font + 2048))) | ((X-1 = 0) & (g+256 >= (_font + 2048)))
+    inc g+1
+    ;   ((X-1 > 0) & (g < (_font + 2048))) | ((X-1 = 0) & (g >= (_font + 2048)))
+
+    ;   (p + _width) < (_frame + size of bitmap)
+    clc
+    lda #RIGHT
+    adc p
+    sta p
+    ;   p < (_frame + size of bitmap)
+
+    ;   ((X-1 > 0) & (g < (_font + 2048))) | ((X-1 = 0) & (g >= (_font + 2048)))
+    dex 
+    ;   ((X > 0) & (g < (_font + 2048))) | ((X = 0) & (g >= (_font + 2048)))
+    bne L1
+    ; X = 0 & g >= (_font + 2048) & S = [g, p, D, Y, X, A]
+
+    ; S = [g, p, D, Y, X, A]
+    tsc
+    clc
+    adc #8
+    tcs
+    ; S = [D, Y, X, A]
+
+    pld
     ply
     plx
     pla
-    plb
     rts
 .endproc
 

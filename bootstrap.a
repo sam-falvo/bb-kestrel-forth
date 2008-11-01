@@ -6,25 +6,13 @@
     .include "hw/chipset.inc"
     .include "vm.inc"
 
-    .rodata
-
-romFont:
-    .incbin "font.bin"
-
 
     .code
 
 .export __n_reset
-.import _wide
-.import _useFramebuffer
-.import _useFont
-.import _plotGlyph
-.import _setWindowOrigin
-.import _setWindowExtent
-.import _setXY
-.import _cursorRight
-.import _typeCharacter
-.import _carriageReturn
+.import tioInitialize
+.import tioTypeCharacter
+.import tioCarriageReturn
 .proc __n_reset
     ;; This is the native-mode cold-boot entry point.  This procedure
     ;; never returns.
@@ -39,41 +27,16 @@ romFont:
     jsr initializeMGIA
     jsr initializeIRQ
     cli
-
-    lit 80
-    jsr _wide
-
-    lit 0
-    lit $FE
-    jsr _useFramebuffer
-
-    lit romFont
-    lit 0
-    jsr _useFont
+    jsr tioInitialize
 
     lda #0
-    tay
-    jsr _setWindowOrigin
-    jsr _setXY
-
-    lda #80
-    ldy #60
-    jsr _setWindowExtent
-
-
-    lda #0
-L1: jsr _typeCharacter
+L1: jsr tioTypeCharacter
     inc
     cmp #1117
     bcc L1
-    jsr _carriageReturn
-    jsr _carriageReturn
-    jsr _carriageReturn
-    jsr _carriageReturn
-    jsr _carriageReturn
-    jsr _carriageReturn
-    jsr _carriageReturn
-    jsr _carriageReturn
+    jsr tioCarriageReturn
+    jsr tioCarriageReturn
+    jsr tioCarriageReturn
     lda #0
     jmp L1
 .endproc
