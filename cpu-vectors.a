@@ -163,6 +163,9 @@ moveAnotherByte:
     lda #$7FFF
     tcs
     jsr resetCpuVectorTable
+    lda #0
+    tcd
+    ldx #$00FE
     jmp __n_reset
 .endproc
 

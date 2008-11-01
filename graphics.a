@@ -4,6 +4,7 @@
 
 
     .include "hw/cpu.inc"
+    .include "vm.inc"
 
 
 ;
@@ -31,21 +32,21 @@ _width:     .res 2
 
 .export _useFramebuffer
 .proc _useFramebuffer
-    sta _frame
-    sty _frame+2
+    st  _frame+2
+    st  _frame
     rts
 .endproc
 
 .export _useFont
 .proc _useFont
-    sta _font
-    sty _font+2
+    st  _font+2
+    st  _font
     rts
 .endproc
 
 .export _wide
 .proc _wide
-    sta _width
+    st  _width
     rts
 .endproc
 

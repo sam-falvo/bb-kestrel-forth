@@ -4,7 +4,7 @@
 
     .include "hw/cpu.inc"
     .include "hw/chipset.inc"
-
+    .include "vm.inc"
 
     .rodata
 
@@ -40,15 +40,15 @@ romFont:
     jsr initializeIRQ
     cli
 
-    lda #80
+    lit 80
     jsr _wide
 
-    lda #0
-    ldy #$FE
+    lit 0
+    lit $FE
     jsr _useFramebuffer
 
-    lda #romFont
-    ldy #0
+    lit romFont
+    lit 0
     jsr _useFont
 
     lda #0
