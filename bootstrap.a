@@ -12,6 +12,8 @@
 .import tioInitialize
 .import tioTypeCharacter
 .import tioCarriageReturn
+.import tioShowCursor
+.import tioToggleCursor
 .proc __n_reset
     ;; This is the native-mode cold-boot entry point.  This procedure
     ;; never returns.
@@ -28,6 +30,7 @@
     cli
     jsr tioInitialize
 
+    jsr tioShowCursor
     lda #0
 L1: jsr tioTypeCharacter
     inc
@@ -36,6 +39,15 @@ L1: jsr tioTypeCharacter
     jsr tioCarriageReturn
     jsr tioCarriageReturn
     jsr tioCarriageReturn
+
+    lda #90
+    ldx #0
+L2: dex
+    bne L2
+    dec
+    jsr tioToggleCursor
+    bne L2
+
     lda #0
     jmp L1
 .endproc

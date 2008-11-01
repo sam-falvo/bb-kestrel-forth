@@ -32,6 +32,13 @@ romFont:
 cx:     .res 2      ; invariant: 0 <= x < right
 cy:     .res 2      ; invariant: 0 <= y < bottom
 
+    ; Non-zero if the cursor is obscured from the screen.
+hidden: .res 2      ; invariant: 0 <= hidden <= 65535
+
+    ; Non-zero if the cursor is physically rendered to the screen.
+cursorIsDrawn: .res 2
+
+
 RIGHT   = 80
 BOTTOM  = 60
 
@@ -50,6 +57,7 @@ _frame: .res 4
     pha
     stz cx
     stz cy
+    stz hidden
     lda #romFont
     sta _font
     stz _font+2
@@ -95,18 +103,10 @@ _frame: .res 4
     ;   0 <= cx < right
     ;   0 <= cy < bottom
 
+    pha
+
     sta cx
     sty cy
-.endproc
-    ; tioSetXY falls through to tioConstrainCursor
-.proc tioConstrainCursor
-    ; Enforces the invariant that a cursor must always fit on the screen.
-    ;
-    ; Postconditions:
-    ;   0 <= cx < right
-    ;   0 <= cy < bottom
-
-    pha
 
     lda #RIGHT-1
     cmp cx
@@ -355,6 +355,189 @@ L1: ; invariant: X >= 1
     tcs
     ; S = [D, Y, X, A]
 
+    pld
+    ply
+    plx
+    pla
+    rts
+.endproc
+
+.export tioShowCursor
+.proc tioShowCursor
+    ; Decrements the hide-count for the cursor.  If non-zero, the cursor is
+    ; not visible to the user.  Otherwise, the cursor will be rendered.
+    ;
+    ; pre-conditions:
+    ;   0 <= hidden <= 65535
+    ;
+    ; post-conditions:
+    ;   0 <= hidden <= old hidden <= 65535
+
+    pha
+    lda hidden
+    beq alreadyZero     ; 0 = hidden
+    ; 0 < hidden
+    ; 0 <= hidden-1
+    dec
+    ; 0 <= hidden
+    sta hidden
+alreadyZero:
+    ; 0 <= hidden
+    pla
+    rts
+.endproc
+
+.export tioHideCursor
+.proc tioHideCursor
+    ; Increments the hide-count for the cursor.
+    ;
+    ; pre-conditions:
+    ;   0 <= hidden <= 65535
+    ;
+    ; post-conditions:
+    ;   0 <= old hidden <= hidden <= 65535
+
+    pha
+    lda hidden
+    cmp #-1
+    beq alreadyMaxedOut     ; hidden = 65535
+    ; hidden+1 <= 65535
+    inc
+    ; hidden <= 65535
+    sta hidden
+alreadyMaxedOut:
+    ; hidden <= 65535
+    pla
+    rts
+.endproc
+
+.export tioToggleCursor
+.proc tioToggleCursor
+    ; If the cursor is visible, alternate between (in)visible
+    ; states, giving the illusion of a blinking cursor over time.
+
+    pha
+    lda #0
+    jsr affectCursor
+    pla
+    rts
+.endproc
+
+.export tioDrawCursor
+.proc tioDrawCursor
+    ; Guarantee the cursor is drawn on the screen.
+
+    pha
+    lda #8
+    jsr affectCursor
+    pla
+    rts
+.endproc
+
+.export tioEraseCursor
+.proc tioEraseCursor
+    pha
+    lda #16
+    jsr affectCursor
+    pla
+    rts
+.endproc
+
+.proc affectCursor
+    ; pre-conditions:
+    ;   A[2:0] = 0
+    ;   A[4:3] = operation sub-table ID (00 = toggle, 01 = draw, 10 = erase)
+
+    ; S = []
+    phx
+    ; S = [X]
+
+    ; A[2] = 0
+    ldx cursorIsDrawn
+    beq cursorIsErased
+    ora #$04
+cursorIsErased:
+    ; A[2] = 1 if cursor is current drawn on the screen
+
+    ; A[1] = 0
+    ldx hidden
+    beq cursorIsVisible
+    ora #$02
+cursorIsVisible:
+    ; A[1] = 1 if cursor is hidden from the user
+
+    ; A[4:3] = command ID
+    ; A[2] = 1 if cursor is currently drawn on the screen
+    ; A[1] = 1 if cursor is hidden from the user (see tioShowCursor, et. al.)
+    ; A[0] = 0
+    tax
+    jmp (J,x)
+    ;       +--------------------------  visible and erased
+    ;       |      +-------------------  hidden and erased
+    ;       |      |       +-----------  visible and drawn
+    ;       |      |       |       +---  hidden and drawn
+    ;       |      |       |       |
+J:  .word _draw, _noop, _erase, _erase      ; toggle actions
+    .word _draw, _noop, _noop,  _noop       ; draw actions
+    .word _noop, _noop, _erase, _erase      ; erase actions
+
+_draw:
+    lda #-1
+    sta cursorIsDrawn
+    jsr tioXORCursor
+    ; S = [X]
+    plx
+    rts
+
+_erase:
+    stz cursorIsDrawn
+    jsr tioXORCursor
+
+_noop:
+    ; S = [X]
+    plx
+    rts
+
+.endproc
+
+.proc tioXORCursor
+    pha
+    phx
+    phy
+    phd
+    ; S = [D,Y,X,A]
+
+    lda _frame+2
+    pha
+    lda _frame
+    pha
+
+    jsr cursorOffsetInBitmap
+    clc
+    adc 1,s
+    sta 1,s
+    lda 3,s
+    adc #0
+    sta 3,s
+    tsc
+    tcd
+
+    ldy #0
+    ldx #8
+L:  lda [1],y
+    eor #$FF
+    sta [1],y
+    tya
+    clc
+    adc #80
+    tay
+    dex
+    bne L
+
+    ; S = [p, D, Y, X, A]
+    plx
+    plx
+    ; S = [D,Y,X,A]
     pld
     ply
     plx
