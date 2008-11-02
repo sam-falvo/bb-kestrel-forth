@@ -68,6 +68,11 @@ _font:  .res 4
 
 .export tioTypeCharacter
 .proc tioTypeCharacter
+    jsr tioHideCursor
+    jsr i_TypeCharacter
+    jmp tioShowCursor
+.endproc
+.proc i_TypeCharacter
     ; Prints a single character to the screen.
     ;
     ; Preconditions:
@@ -84,14 +89,19 @@ _font:  .res 4
 
     pha
     and #$00FF
-    jsr plotGlyph
-    jsr tioCursorRight
+    jsr i_PlotGlyph
+    jsr i_CursorRight
     pla
     rts
 .endproc
 
 .export tioSetXY
 .proc tioSetXY
+    jsr tioHideCursor
+    jsr i_SetXY
+    jmp tioShowCursor
+.endproc
+.proc i_SetXY
     ; Pre-conditions:
     ;   A = column
     ;   Y = row
@@ -131,7 +141,7 @@ cy_le_bottom:
     rts
 .endproc
 
-.proc cursorOffsetInBitmap
+.proc i_CursorOffsetInBitmap
     ; Pre-conditions:
     ;   0 <= cx < right
     ;   0 <= cy < bottom
@@ -171,6 +181,11 @@ L2: bne L1          ; invariant: Y /= 0
 
 .export tioCursorRight
 .proc tioCursorRight
+    jsr tioHideCursor
+    jsr i_CursorRight
+    jmp tioShowCursor
+.endproc
+.proc i_CursorRight
     ; Pre-conditions:
     ;   0 <= cx < right
     ;   0 <= cy < bottom
@@ -192,11 +207,23 @@ L2: bne L1          ; invariant: Y /= 0
 cx_1_ge_right:              ; S = [A], (cx+1) >= right
     stz cx                  ; cx = 0; 0 <= cx < right
     pla                     ; S = []
-    jmp tioCursorDown
+    jmp i_CursorDown
+.endproc
+
+.export tioCursorDown
+.proc tioCursorDown
+    jsr tioHideCursor
+    jsr i_CursorDown
+    jmp tioShowCursor
 .endproc
 
 .export tioCarriageReturn
 .proc tioCarriageReturn
+    jsr tioHideCursor
+    jsr i_CarriageReturn
+    jmp tioShowCursor
+.endproc
+.proc i_CarriageReturn
     ; pre-conditions:
     ;   0 <= cy < bottom
     ;
@@ -215,8 +242,7 @@ cx_1_ge_right:              ; S = [A], (cx+1) >= right
     ; S = []
 .endproc
     ; fall through
-.export tioCursorDown
-.proc tioCursorDown
+.proc i_CursorDown
     ; pre-conditions:
     ;   0 <= cy < bottom
     ;
@@ -247,7 +273,7 @@ cy_1_ge_bottom:
     ; S = []
 .endproc
     ; fall through again!
-.proc verticalScroll
+.proc i_VerticalScroll
     phb
     pha
     phx
@@ -271,8 +297,7 @@ cy_1_ge_bottom:
     plb
     rts
 .endproc
-
-.proc plotGlyph
+.proc i_PlotGlyph
     ; Preconditions:
     ;   0 <= A < 256; A = character to display
     ;   _font points to a 2048 x 8 bitmap containing character glyphs.
@@ -285,7 +310,7 @@ cy_1_ge_bottom:
     ; S = [D, Y, X, A]
 
     pea $00FE
-    jsr cursorOffsetInBitmap
+    jsr i_CursorOffsetInBitmap
     pha
 
     ; S = [p, D, Y, X, A]
@@ -370,6 +395,8 @@ L1: ; invariant: X >= 1
     sta hidden
 alreadyZero:
     ; 0 <= hidden
+
+    jsr tioDrawCursor
     pla
     rts
 .endproc
@@ -394,6 +421,7 @@ alreadyZero:
     sta hidden
 alreadyMaxedOut:
     ; hidden <= 65535
+    jsr tioEraseCursor
     pla
     rts
 .endproc
@@ -405,7 +433,7 @@ alreadyMaxedOut:
 
     pha
     lda #0
-    jsr affectCursor
+    jsr i_AffectCursor
     pla
     rts
 .endproc
@@ -416,7 +444,7 @@ alreadyMaxedOut:
 
     pha
     lda #8
-    jsr affectCursor
+    jsr i_AffectCursor
     pla
     rts
 .endproc
@@ -425,12 +453,12 @@ alreadyMaxedOut:
 .proc tioEraseCursor
     pha
     lda #16
-    jsr affectCursor
+    jsr i_AffectCursor
     pla
     rts
 .endproc
 
-.proc affectCursor
+.proc i_AffectCursor
     ; pre-conditions:
     ;   A[2:0] = 0
     ;   A[4:3] = operation sub-table ID (00 = toggle, 01 = draw, 10 = erase)
@@ -471,14 +499,14 @@ J:  .word _draw, _noop, _erase, _erase      ; toggle actions
 _draw:
     lda #-1
     sta cursorIsDrawn
-    jsr tioXORCursor
+    jsr i_XORCursor
     ; S = [X]
     plx
     rts
 
 _erase:
     stz cursorIsDrawn
-    jsr tioXORCursor
+    jsr i_XORCursor
 
 _noop:
     ; S = [X]
@@ -487,7 +515,7 @@ _noop:
 
 .endproc
 
-.proc tioXORCursor
+.proc i_XORCursor
     pha
     phx
     phy
@@ -495,7 +523,7 @@ _noop:
     ; S = [D,Y,X,A]
 
     pea $00FE
-    jsr cursorOffsetInBitmap
+    jsr i_CursorOffsetInBitmap
     pha
     ; S = [p,D,Y,X,A]
 
