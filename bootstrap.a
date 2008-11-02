@@ -6,6 +6,13 @@
     .include "hw/chipset.inc"
 
 
+    .bss
+
+    ; Count-down counter for cursor; after `blinker' frames, the state
+    ; of the cursor toggles.
+blinker:
+    .res 2
+
     .code
 
 .export __n_reset
@@ -13,6 +20,7 @@
 .import tioTypeCharacter
 .import tioCarriageReturn
 .import tioShowCursor
+.import tioHideCursor
 .import tioToggleCursor
 .proc __n_reset
     ;; This is the native-mode cold-boot entry point.  This procedure
@@ -30,6 +38,9 @@
     cli
     jsr tioInitialize
 
+    lda #1
+    sta blinker
+
     jsr tioShowCursor
     lda #0
 L1: jsr tioTypeCharacter
@@ -45,7 +56,6 @@ L1: jsr tioTypeCharacter
 L2: dex
     bne L2
     dec
-    jsr tioToggleCursor
     bne L2
 
     lda #0
@@ -116,14 +126,24 @@ globalIrqHandler:
     bit #IQVRLI
     beq noPendingInterrupt
 
+    ; acknowledge MGIA interrupt
     and #~IQVRLI
     sta IQPN
 
+    ; reset fetch pointer to beginning of frame buffer
     lda #$0000
     sta VIDAPTL
     lda #$00FE
     sta VIDAPTH
 
+    ; implement cursor blinking logic
+    dec blinker
+    bne done
+    lda #30
+    sta blinker
+    jsr tioToggleCursor
+
+done:
 noPendingInterrupt:
     rts
 .endproc
