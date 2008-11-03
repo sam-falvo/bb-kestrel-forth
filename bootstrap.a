@@ -20,8 +20,9 @@ blinker:
 .import tioTypeCharacter
 .import tioCarriageReturn
 .import tioShowCursor
-.import tioHideCursor
-.import tioToggleCursor
+.import tioClear
+.import tioHome
+.import tioTypeString
 .proc __n_reset
     ;; This is the native-mode cold-boot entry point.  This procedure
     ;; never returns.
@@ -40,26 +41,20 @@ blinker:
 
     lda #1
     sta blinker
-
     jsr tioShowCursor
-    lda #0
-L1: jsr tioTypeCharacter
-    inc
-    cmp #1117
-    bcc L1
-    jsr tioCarriageReturn
-    jsr tioCarriageReturn
-    jsr tioCarriageReturn
 
-    lda #90
-    ldx #0
-L2: dex
-    bne L2
-    dec
-    bne L2
+    jsr tioClear
+    jsr tioHome
+    ldx #Msg1
+    ldy #Msg1Len
+    jsr tioTypeString
+    jsr tioCarriageReturn
+    bra *
 
-    lda #0
-    jmp L1
+Msg1:
+    .byte "**** Kestrel Keyboard Demonstrator ****"
+Msg1Len = *-Msg1
+
 .endproc
 
 
@@ -121,6 +116,7 @@ globalIrqHandler:
 .endproc
 
 
+.import tioToggleCursor
 .proc processPendingMgiaInterrupt
     lda IQPN
     bit #IQVRLI

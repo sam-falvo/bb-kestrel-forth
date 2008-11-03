@@ -553,3 +553,71 @@ L:  lda [1],y
     rts
 .endproc
 
+.export tioClear
+.proc tioClear
+    jsr tioHideCursor
+    jsr i_Clear
+    jmp tioShowCursor
+.endproc
+
+.proc i_Clear
+    pha
+    phb
+    lda #0
+    sta $FE0000
+    tax
+    lda #38400
+    ldy #1
+    mvn $FE, $FE
+    plb
+    pla
+    rts
+.endproc
+
+.export tioHome
+.proc tioHome
+    pha
+    phy
+    lda #0
+    tay
+    jsr tioSetXY
+    ply
+    pla
+    rts
+.endproc
+
+.export tioTypeString
+.proc tioTypeString
+    jsr tioHideCursor
+    jsr i_TypeString
+    jmp tioShowCursor
+.endproc
+
+.proc i_TypeString
+    ; Preconditions:
+    ;   X = address of the string to print
+    ;   Y = number of characters to print
+    ;
+    ;   Note that character codes like $0D (carriage return) or $0A
+    ;   (line feed) are NOT INTERPRETED by this routine.
+    ;
+    ; Postconditions:
+    ;   All register values preserved.
+
+    pha
+    phx
+    phy
+
+L:  lda 0,x
+    and #$00FF
+    jsr i_TypeCharacter
+    inx
+    dey
+    bne L
+
+    ply
+    plx
+    pla
+    rts
+.endproc
+
