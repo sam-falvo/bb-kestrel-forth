@@ -2,7 +2,7 @@
     .a16
     .i16
 
-    .include "include/hw/cpu.inc"
+    .include "hw/cpu.inc"
 
 ;
 ; Hardware vectors, embedded in ROM, force the microprocessor to vector
