@@ -23,6 +23,8 @@ blinker:
 .import tioClear
 .import tioHome
 .import tioTypeString
+.import tioGetKey
+.import tioTypeHex16
 .proc __n_reset
     ;; This is the native-mode cold-boot entry point.  This procedure
     ;; never returns.
@@ -34,7 +36,6 @@ blinker:
     ;   CPU in native mode.
     ;   RAM-resident exception/interrupt vector table initialized.
 
-    jsr initializeMGIA
     jsr initializeIRQ
     cli
     jsr tioInitialize
@@ -49,7 +50,16 @@ blinker:
     ldy #Msg1Len
     jsr tioTypeString
     jsr tioCarriageReturn
-    bra *
+    
+L0: ldx #30
+L1: jsr tioGetKey
+    sta buffer,x
+    jsr tioTypeHex16
+    dex
+    dex
+    bpl L1
+    jsr tioCarriageReturn
+    jmp L0
 
 Msg1:
     .byte "**** Kestrel Keyboard Demonstrator ****"
@@ -57,36 +67,9 @@ Msg1Len = *-Msg1
 
 .endproc
 
-
-.proc initializeMGIA
-    ;; Initializes the Monochrome Graphics Interface Adapter.
-    ;; The MGIA was originally specified for implementation in an
-    ;; FPGA; hence, programming the emulator's version of it resembles
-    ;; a more traditional video chip.  In reality, it remains to be seen
-    ;; if an FPGA will provide the functionality, or if a SEAforth chip
-    ;; will.  If the latter, this code will change markedly.
-
-    lda #800                ; Set CRTC for VGA monitor, 60Hz refresh
-    sta CCHZTL
-    lda #525
-    sta CCVRTL
-    lda #$025F
-    sta CCSYWD
-
-    lda #140                ; Set display to center of the display
-    sta VIHZST              ; (hopefully)
-    lda #780
-    sta VIHZEN
-    lda #34
-    sta VIVRST
-    lda #514
-    sta VIVREN
-
-    inc                     ; Set raster line for display interrupt
-    sta CCVRLI
-    rts
-.endproc
-
+.bss
+buffer: .res 64
+.code
 
 .import nativeModeIRQVector
 .proc initializeIRQ
@@ -95,7 +78,7 @@ Msg1Len = *-Msg1
 
     lda #0
     sta IQPN
-    lda #IQVRLI
+    lda #IQVRLI | IQKBMO
     sta IQEA
     rts
 
@@ -107,6 +90,7 @@ globalIrqHandler:
     phy
 
     jsr processPendingMgiaInterrupt
+    jsr processPendingKeyboardInterrupt
 
     ply
     plx
@@ -141,6 +125,24 @@ globalIrqHandler:
 
 done:
 noPendingInterrupt:
+    rts
+.endproc
+
+.import tioRawKeyEvent
+.proc processPendingKeyboardInterrupt
+    lda IQPN
+    bit #IQKBMO
+    beq noPendingKeyboardInterrupt
+    and #~IQKBMO
+    sta IQPN
+
+    lda KBMOST
+    and #$4000
+    asl
+    ora KBDA
+    jsr tioRawKeyEvent
+
+noPendingKeyboardInterrupt:
     rts
 .endproc
 

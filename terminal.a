@@ -4,6 +4,7 @@
 
 
     .include "hw/cpu.inc"
+    .include "hw/chipset.inc"
 
 
 ;
@@ -27,6 +28,14 @@ romFont:
 
 
     .bss
+
+    ; Keyboard scancode last detected
+lastKeyPressed:
+        .res 2
+
+    ; Number of raw keyboard events since last tioGetKey
+rawKeyEvents:
+        .res 2
 
     ; The current (x,y) cursor position.
 cx:     .res 2      ; invariant: 0 <= x < right
@@ -55,6 +64,31 @@ _font:  .res 4
 .export tioInitialize
 .proc tioInitialize
     pha
+
+    ; initialize the MGIA chip for rendering a VGA-standard image.
+
+    lda #800
+    sta CCHZTL
+    lda #525
+    sta CCVRTL
+    lda #$025F
+    sta CCSYWD
+
+    ; set the display to the (hopefully) center of the view'ers monitor.
+
+    lda #140
+    sta VIHZST
+    lda #780
+    sta VIHZEN
+    lda #34
+    sta VIVRST
+    lda #514
+    sta VIVREN
+    inc
+    sta CCVRLI
+
+    ; initialize cursor position, display font, and other details.
+
     stz cx
     stz cy
     stz hidden
@@ -619,5 +653,96 @@ L:  lda 0,x
     plx
     pla
     rts
+.endproc
+
+.export tioRawKeyEvent
+.proc tioRawKeyEvent
+    ; Pre-conditions:
+    ;   Called from inside interrupt handler or similar keyboard-related
+    ;   driver service.
+    ;
+    ;   A = raw key scancode
+    ;
+    ; Post-conditions:
+    ;   tioGetKey guaranteed not to block.
+    ;   tioGetKey would return raw scancode.
+
+    inc rawKeyEvents
+    sta lastKeyPressed
+    rts
+.endproc
+
+.export tioGetKey
+.proc tioGetKey
+    ; Pre-conditions:
+    ;   An interrupt handler installed to watch over keyboard events.
+    ;   It must invoke tioRawKeyEvent when a keyboard press is detected.
+    ;   Interrupts enabled.
+    ;
+    ; Post-conditions without keyboard interrupt handler OR interrupts disabled:
+    ;   Deadlock.
+    ;
+    ; Post-conditions with interrupt handler:
+    ;   Blocks until a raw keyboard scancode becomes available.
+    ;   A = key code retrieved.
+
+L:  lda rawKeyEvents
+    beq L
+    php
+    sei
+    lda lastKeyPressed
+    stz rawKeyEvents
+    plp
+    rts
+.endproc
+
+.export tioTypeHex16
+.proc tioTypeHex16
+    ; Pre-conditions:
+    ;   A[0:15] = value to print
+    ;
+    ; Post-conditions:
+    ;   X, Y preserved.  Text displayed on screen with cursor updated.
+    ;   A = last ASCII character printed
+
+    pha
+    xba
+    jsr tioTypeHex8
+    pla
+.endproc
+.export tioTypeHex8
+.proc tioTypeHex8
+    ; Pre-conditions:
+    ;   A[0:7] = value to print
+    ;
+    ; Post-conditions:
+    ;   X, Y preserved.  Text displayed on screen with cursor updated.
+    ;   A = last ASCII character printed
+
+    pha
+    lsr
+    lsr
+    lsr
+    lsr
+    jsr tioTypeHex4
+    pla
+.endproc
+.proc tioTypeHex4
+    ; Pre-conditions:
+    ;   A[0:3] = value to print
+    ;
+    ; Post-conditions:
+    ;   X, Y preserved.  Text displayed on screen with cursor updated.
+    ;   A = ASCII character corresponding to the nybble printed.
+
+    phx
+    and #$000F
+    tax
+    lda hextable,x
+    plx
+    jmp tioTypeCharacter
+
+hextable:
+    .byte "0123456789ABCDEF"
 .endproc
 
