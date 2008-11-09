@@ -40,6 +40,24 @@ lastKeyPressed:
 rawKeyEvents:
     .res 2
 
+    ; The current shift status bits.  The flags are laid out as follows:
+    ; BIT  0: left shift
+    ;      1: right shift
+    ;      2: left control
+    ;      3: right control
+    ;      4: left alt
+    ;      5: right alt
+    ;      6: left logo
+    ;      7: right logo
+    ;      8: reserved for (currently non-existant) left menu
+    ;      9: right menu
+    ;  10-13: 0
+    ;     14: NUM-lock
+    ;     15: CAPS-lock
+.export shiftStatus
+shiftStatus:
+    .res 2
+
     ; The current (x,y) cursor position.
 cx:     .res 2      ; invariant: 0 <= x < right
 cy:     .res 2      ; invariant: 0 <= y < bottom
@@ -729,6 +747,7 @@ L:  lda 0,x
     ; Post-conditions with interrupt handler:
     ;   Blocks until a raw keyboard scancode becomes available.
     ;   A = key code retrieved.
+    ;   shiftState updated.
 
 L:  lda rawKeyEvents
     beq L
@@ -737,7 +756,62 @@ L:  lda rawKeyEvents
     lda lastKeyPressed
     stz rawKeyEvents
     plp
+
+
+    ; update the shift status flags
+    pha
+    phx
+    ; S = [X, keycode]
+
+    ldx #0      ; let X = 2*index in...
+    ; index = 0
+L1: ; INVARIANT: 0 <= index < 22
+    ; index+1 <= 22
+    lda shiftCmpTable,x
+    cmp 3,s
+    beq shiftDetected
+    inx
+    inx         ; index <= 22
+    cpx #44
+    bcc L1      ; index < 22
+    ; index = 22
+    ; keycode not in shiftTable
+    ; shiftStatus = old shiftStatus
+    ; ((keycode in shiftTable[DOWN_RANGE]) & ((shiftStatus and shiftTable[keycode]) /= 0)
+    ;  and (keycode in shiftTable[UP_RANGE]) & ((shiftStatus and shiftTable[keycode]) = 0)
+    ;  and (keycode not in shiftTable) & (shiftStatus = old shiftStatus))
+    ; S = [X, keycode]
+    plx
+    pla
     rts
+
+shiftDetected:
+    ; S = [X, keycode]
+    ; X = 2*index; 0 <= index < 22
+    lda shiftStatus
+    and andTable,x
+    ora orTable,x
+    sta shiftStatus
+    ; ((keycode in shiftTable[DOWN_RANGE]) & ((shiftStatus and shiftTable[keycode]) /= 0)
+    ;  and (keycode in shiftTable[UP_RANGE]) & ((shiftStatus and shiftTable[keycode]) = 0)
+    ;  and (keycode not in shiftTable) & (shiftStatus = old shiftStatus))
+    ; S = [X, keycode]
+    plx
+    pla
+    rts
+
+shiftCmpTable:
+    ;     LShift RShift LCtrl  RCtrl  LAlt   RAlt   LLogo  RLogo  RMenu  CAPS   NUMLK
+    .word $8032, $803E, $8025, $806D, $8040, $8071, $8073, $8074, $8075, $8042, $804D     ; DOWN
+    .word $0032, $003E, $0025, $006D, $0040, $0071, $0073, $0074, $0075, $0042, $004D     ; UP
+
+orTable:
+    .word $0001, $0002, $0004, $0008, $0010, $0020, $0040, $0080, $0200, $8000, $4000     ; DOWN
+    .word $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000     ; UP
+
+andTable:
+    .word $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF     ; DOWN
+    .word $FFFE, $FFFD, $FFFB, $FFF7, $FFEF, $FFDF, $FFBF, $FF7F, $FDFF, $7FFF, $BFFF     ; UP
 .endproc
 
 .export tioTypeHex16

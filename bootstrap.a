@@ -25,6 +25,7 @@ blinker:
 .import tioTypeString
 .import tioGetKey
 .import tioTypeHex16
+.import shiftStatus
 .proc __n_reset
     ;; This is the native-mode cold-boot entry point.  This procedure
     ;; never returns.
@@ -55,11 +56,25 @@ L0: ldx #30
 L1: jsr tioGetKey
     sta buffer,x
     jsr tioTypeHex16
+    jsr space
+    txa
+    jsr tioTypeHex16
+    jsr space
+    lda shiftStatus
+    jsr tioTypeHex16
+    jsr tioCarriageReturn
     dex
     dex
     bpl L1
     jsr tioCarriageReturn
     jmp L0
+
+space:
+    pha
+    lda #32
+    jsr tioTypeCharacter
+    pla
+    rts
 
 Msg1:
     .byte "**** Kestrel Keyboard Demonstrator ****"
