@@ -23,6 +23,9 @@
 
     .rodata
 
+    ; The font used to draw characters to the screen.  Arranged as a 2048x8
+    ; monochrome bitmap.
+
 romFont:
     .incbin "font.bin"
 
@@ -31,11 +34,11 @@ romFont:
 
     ; Keyboard scancode last detected
 lastKeyPressed:
-        .res 2
+    .res 2
 
     ; Number of raw keyboard events since last tioGetKey
 rawKeyEvents:
-        .res 2
+    .res 2
 
     ; The current (x,y) cursor position.
 cx:     .res 2      ; invariant: 0 <= x < right
@@ -54,8 +57,9 @@ cursorIsDrawn: .res 2
 RIGHT   = 80
 BOTTOM  = 60
 
-    ; pointer to a 2048x8 pixel bitmap containing the font to draw with.
-    ; All glyphs are 8x8 pixels in size.
+    ; Pointer to a 2048x8 pixel bitmap containing the font to draw with.
+    ; All glyphs are 8x8 pixels in size.  A long pointer permits the
+    ; font to appear anywhere in the CPU's address space.
 _font:  .res 4
 
 
@@ -136,9 +140,11 @@ _font:  .res 4
     jmp tioShowCursor
 .endproc
 .proc i_SetXY
+    ; Moves the cursor to an absolute position on the screen.
+    ;
     ; Pre-conditions:
-    ;   A = column
-    ;   Y = row
+    ;   A = character column
+    ;   Y = character row
     ;
     ; Post-conditions:
     ;   0 <= cx < right
@@ -176,6 +182,9 @@ cy_le_bottom:
 .endproc
 
 .proc i_CursorOffsetInBitmap
+    ; Compute the byte offset in the frame buffer corresponding to the cursor
+    ; position.
+    ;
     ; Pre-conditions:
     ;   0 <= cx < right
     ;   0 <= cy < bottom
@@ -220,6 +229,8 @@ L2: bne L1          ; invariant: Y /= 0
     jmp tioShowCursor
 .endproc
 .proc i_CursorRight
+    ; Advance the cursor right one character.
+    ;
     ; Pre-conditions:
     ;   0 <= cx < right
     ;   0 <= cy < bottom
@@ -258,6 +269,8 @@ cx_1_ge_right:              ; S = [A], (cx+1) >= right
     jmp tioShowCursor
 .endproc
 .proc i_CarriageReturn
+    ; Affect the cursor so as to perform a carriage return.
+    ;
     ; pre-conditions:
     ;   0 <= cy < bottom
     ;
@@ -266,17 +279,15 @@ cx_1_ge_right:              ; S = [A], (cx+1) >= right
     ;   0 <= cy < bottom
     ;   old cy <= cy <= old cy+1
 
-    ; S = []
-    pha
-    ; S = [A]
-
     stz cx
-    ; cx = left, S = [A]
-    pla
-    ; S = []
+    ; cx = left, S = []
 .endproc
     ; fall through
 .proc i_CursorDown
+    ; Move the cursor down one line.
+    ;
+    ; This procedure will scroll the screen as required.
+    ;
     ; pre-conditions:
     ;   0 <= cy < bottom
     ;
@@ -308,18 +319,31 @@ cy_1_ge_bottom:
 .endproc
     ; fall through again!
 .proc i_VerticalScroll
+    ; Performs a vertical scroll of the bitmapped framebuffer.
+    ;
+    ; Pre-conditions:
+    ;   640x480 monochrome bitmap, with progressive memory layout.
+    ;
+    ; Post-conditions:
+    ;   0th row discarded.
+    ;   1st through 58th rows moved up one row.
+    ;   59th visual row cleared to all black.
+
     phb
     pha
     phx
     phy
 
     lda #37760              ; scroll the entire bitmap up.
-    ldx #640                ; should be migrated into graphics.a
+    ldx #640
     ldy #0
     mvn $FE, $FE
 
+    ; As a side-effect of the MVN instruction, B = $FE.  All 16-bit memory
+    ; accesses occurs in frame buffer now.
+
     ldx #37760              ; Clear bottom line of the screen
-    lda #0                  ; should also be in graphics.a
+    lda #0
     sta 0,x
     ldy #37761
     lda #640
@@ -331,7 +355,10 @@ cy_1_ge_bottom:
     plb
     rts
 .endproc
+
 .proc i_PlotGlyph
+    ; Plots a character at the current cursor position.
+    ;
     ; Preconditions:
     ;   0 <= A < 256; A = character to display
     ;   _font points to a 2048 x 8 bitmap containing character glyphs.
@@ -347,34 +374,34 @@ cy_1_ge_bottom:
     jsr i_CursorOffsetInBitmap
     pha
 
-    ; S = [p, D, Y, X, A]
+    ; S = [p, D, Y, X, A], where p = pointer of glyph in framebuffer
 
     lda _font+2
     pha
     lda _font
     clc
-    adc 13,s    ; use character specified in A on entry
+    adc 13,s    ; use character specified in A on entry; 0 <= (13,s) < 256
     pha
 
     tsc
     tcd
 
-    ; S = [g, p, D, Y, X, A ]
+    ; S = [g, p, D, Y, X, A ], where g = pointer to glyph in font bitmap.
 
-p   =   5       ; bitmap pointer
-g   =   1       ; glyph pointer
+p   =   5
+g   =   1
 
     ldx #8
     ldy #0
 
-L1: ; invariant: X >= 1
+L1: ; invariant: X >= 1, where X = remaining number of raster lines left
     ;   y = 0
     ;   _font <= g < (_font + 2048)
     ;   _frame <= p < (_frame + size of bitmap)
 
     AX8
-    lda [g],y
-    sta [p],y
+    lda [g],y   ; If alternative visual effects desired, this is the code
+    sta [p],y   ; you'd change.
     AX16
 
     ;   ((X-1 > 0) & (g+256 < (_font + 2048))) | ((X-1 = 0) & (g+256 >= (_font + 2048)))
@@ -449,6 +476,7 @@ alreadyZero:
     lda hidden
     cmp #-1
     beq alreadyMaxedOut     ; hidden = 65535
+    ; hidden < 65535
     ; hidden+1 <= 65535
     inc
     ; hidden <= 65535
@@ -506,7 +534,7 @@ alreadyMaxedOut:
     beq cursorIsErased
     ora #$04
 cursorIsErased:
-    ; A[2] = 1 if cursor is current drawn on the screen
+    ; A[2] = 1 if cursor is currently drawn on the screen
 
     ; A[1] = 0
     ldx hidden
@@ -550,6 +578,8 @@ _noop:
 .endproc
 
 .proc i_XORCursor
+    ; Toggles the cursor's image on the screen.
+
     pha
     phx
     phy
@@ -595,6 +625,8 @@ L:  lda [1],y
 .endproc
 
 .proc i_Clear
+    ; Clears the screen; does NOT alter cursor position.
+
     pha
     phb
     lda #0
@@ -610,6 +642,8 @@ L:  lda [1],y
 
 .export tioHome
 .proc tioHome
+    ; Homes the cursor; short for invoking tioSetXY with (0,0) coordinates.
+
     pha
     phy
     lda #0
@@ -657,15 +691,23 @@ L:  lda 0,x
 
 .export tioRawKeyEvent
 .proc tioRawKeyEvent
+    ; Notify the terminal emulation of a raw keyboard event of some kind.
+    ;
     ; Pre-conditions:
     ;   Called from inside interrupt handler or similar keyboard-related
     ;   driver service.
     ;
-    ;   A = raw key scancode
+    ;   A[15]   = 1 if key was pressed; 0 otherwise.
+    ;   A[14:7] = 0
+    ;   A[6:0]  = raw key scancode
+    ;
+    ;   rawKeyEvents < 65535
     ;
     ; Post-conditions:
     ;   tioGetKey guaranteed not to block.
     ;   tioGetKey would return raw scancode.
+    ;
+    ;   rawKeyEvents <= 65535
 
     inc rawKeyEvents
     sta lastKeyPressed
@@ -674,6 +716,8 @@ L:  lda 0,x
 
 .export tioGetKey
 .proc tioGetKey
+    ; Acquires the last RAW keyboard event.
+    ;
     ; Pre-conditions:
     ;   An interrupt handler installed to watch over keyboard events.
     ;   It must invoke tioRawKeyEvent when a keyboard press is detected.
@@ -698,6 +742,8 @@ L:  lda rawKeyEvents
 
 .export tioTypeHex16
 .proc tioTypeHex16
+    ; Displays a hexadecimal, 16-bit quantity.
+    ;
     ; Pre-conditions:
     ;   A[0:15] = value to print
     ;
@@ -710,8 +756,11 @@ L:  lda rawKeyEvents
     jsr tioTypeHex8
     pla
 .endproc
+    ; fall-through
 .export tioTypeHex8
 .proc tioTypeHex8
+    ; Displays a hexadecimal, 8-bit quantity.
+    ;
     ; Pre-conditions:
     ;   A[0:7] = value to print
     ;
@@ -724,10 +773,13 @@ L:  lda rawKeyEvents
     lsr
     lsr
     lsr
-    jsr tioTypeHex4
+    jsr i_TypeHex4
     pla
 .endproc
-.proc tioTypeHex4
+    ; fall-through
+.proc i_TypeHex4
+    ; Displays a 4-bit hexadecimal value.
+    ;
     ; Pre-conditions:
     ;   A[0:3] = value to print
     ;
