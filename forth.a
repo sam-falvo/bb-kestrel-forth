@@ -1,0 +1,9 @@
+    .p816
+    .a16
+    .i16
+
+.export forthColdBoot
+.proc forthColdBoot
+    jmp *
+.endproc
+

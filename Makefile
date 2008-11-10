@@ -1,5 +1,6 @@
 MODULES =	bootstrap			\
 			cpu-vectors			\
+			forth				\
 			terminal
 
 .SUFFIXES: .a .o

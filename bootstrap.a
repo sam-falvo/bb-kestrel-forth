@@ -6,6 +6,20 @@
     .include "hw/chipset.inc"
 
 
+    ; from forth.a
+    .import forthColdBoot
+
+    ; from terminal.a
+    .import tioCarriageReturn
+    .import tioClear
+    .import tioHome
+    .import tioInitialize
+    .import tioRawKeyEvent
+    .import tioShowCursor
+    .import tioToggleCursor
+    .import tioTypeString
+
+
     .bss
 
     ; Count-down counter for cursor; after `blinker' frames, the state
@@ -16,23 +30,12 @@ blinker:
     .code
 
 .export __n_reset
-.import tioInitialize
-.import tioTypeCharacter
-.import tioCarriageReturn
-.import tioShowCursor
-.import tioClear
-.import tioHome
-.import tioTypeString
-.import tioGetKey
-.import tioTypeHex16
-.import tioShiftStatus
-.import tioAsciiCode
 .proc __n_reset
     ;; This is the native-mode cold-boot entry point.  This procedure
     ;; never returns.
 
     ; Preconditions:
-    ;   S = $7FFF.
+    ;   S initialized.
     ;   Interrupts disabled.
     ;   A, X, Y in 16-bit mode.
     ;   CPU in native mode.
@@ -53,21 +56,12 @@ blinker:
     jsr tioTypeString
     jsr tioCarriageReturn
     
-L0: jsr tioGetKey
-    jsr tioAsciiCode
-    bmi L0
-    jsr tioTypeCharacter
-    jmp L0
+    jmp forthColdBoot
 
 Msg1:
-    .byte "**** Kestrel Keyboard Demonstrator ****"
+    .byte "Kestrel ROM V0-20081110"
 Msg1Len = *-Msg1
-
 .endproc
-
-.bss
-buffer: .res 64
-.code
 
 .import nativeModeIRQVector
 .proc initializeIRQ
@@ -104,7 +98,6 @@ globalIrqHandler:
 .endproc
 
 
-.import tioToggleCursor
 .proc processPendingMgiaInterrupt
     lda IQPN
     bit #IQVRLI
@@ -126,13 +119,13 @@ globalIrqHandler:
     lda #30
     sta blinker
     jsr tioToggleCursor
-
 done:
+
 noPendingInterrupt:
     rts
 .endproc
 
-.import tioRawKeyEvent
+
 .proc processPendingKeyboardInterrupt
     lda IQPN
     bit #IQKBMO
