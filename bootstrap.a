@@ -100,9 +100,14 @@ buffer: .res 64
 globalIrqHandler:
     php
     AX16
+    phb
     pha
     phx
     phy
+
+    pea 0
+    plb
+    plb
 
     jsr processPendingMgiaInterrupt
     jsr processPendingKeyboardInterrupt
@@ -110,6 +115,7 @@ globalIrqHandler:
     ply
     plx
     pla
+    plb
     plp
     rti
 .endproc
