@@ -903,9 +903,16 @@ keyDown:
     ; S = [rawCode, X]
 
     lda shiftStatus
-    and #$0003
-    beq noShiftKeysPressed
+    bit #$0003
+    beq tryCtrl
     lda #$0100
+    ora 1,s
+    sta 1,s
+    bra noShiftKeysPressed
+tryCtrl:
+    bit #$000C
+    beq noShiftKeysPressed
+    lda #$0200
     ora 1,s
     sta 1,s
 noShiftKeysPressed:
@@ -923,14 +930,23 @@ noShiftKeysPressed:
     ; S = [asciiCode, X]
 
     lda shiftStatus
-    and #$800C
+    and #$8000
     beq noCtrlCapsLock
 
     lda 1,s
     cmp #$0061
-    bcc noCtrlCapsLock      ; asciiValue < $61 ('a')
+    bcc tryCapitals         ; asciiValue < $61 ('a')
     cmp #$007B
-    bcs noCtrlCapsLock      ; asciiValue > $7A ('z')
+    bcs tryCapitals         ; asciiValue > $7A ('z')
+    eor #$0020
+    sta 1,s
+    bra noCtrlCapsLock
+
+tryCapitals:
+    cmp #$0041              ; asciiValue < $41 ('A')
+    bcc noCtrlCapsLock
+    cmp #$005B              ; asciiValue > $5A ('Z')
+    bcs noCtrlCapsLock
     eor #$0020
     sta 1,s
 
@@ -997,6 +1013,42 @@ translationTable:
     .byte   'D', 'F', 'G', 'H', 'J', 'K', 'L', ':'      ; +28
     .byte   '"', '~', $FF, '|', 'Z', 'X', 'C', 'V'      ; +30
     .byte   'B', 'N', 'M', '<', '>', '?', $FF, '*'      ; +38
+    .byte   $FF, $20, $FF, $FF, $FF, $FF, $FF, $FF      ; +40
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, '7'      ; +48
+    .byte   '8', '9', '-', '4', '5', '6', '+', '1'      ; +50
+    .byte   '2', '3', '0', '.', $FF, $FF, $FF, $FF      ; +58
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +60
+    .byte   $FF, $FF, $FF, $FF, $0D, $FF, $FF, $FF      ; +68
+    .byte   '/', $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +70
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +78
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +80
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +88
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +90
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +98
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +A0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +A8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +B0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +B8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +C0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +C8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +D0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +D8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +E0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +E8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +F0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +F8
+
+    ;
+    ; controlled
+    ;
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +00
+    .byte   $FF, $1B, '1', $00, '3', '4', '5', '6'      ; +08
+    .byte   '7', '8', '9', '0', '_', '+', $08, $09      ; +10
+    .byte   $11, $17, $05, $12, $14, $19, $15, $09      ; +18
+    .byte   $0F, $10, '{', '}', $0D, $FF, $01, $13      ; +20
+    .byte   $04, $06, $07, $08, $0A, $0B, $0C, ':'      ; +28
+    .byte   '"', '~', $FF, '|', $1A, $18, $03, $16      ; +30
+    .byte   $02, $0E, $0D, '<', '>', '?', $FF, '*'      ; +38
     .byte   $FF, $20, $FF, $FF, $FF, $FF, $FF, $FF      ; +40
     .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, '7'      ; +48
     .byte   '8', '9', '-', '4', '5', '6', '+', '1'      ; +50
