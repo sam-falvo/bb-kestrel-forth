@@ -903,16 +903,16 @@ keyDown:
     ; S = [rawCode, X]
 
     lda shiftStatus
-    bit #$0003
-    beq tryCtrl
-    lda #$0100
+    bit #$000C
+    beq tryShift
+    lda #$0200
     ora 1,s
     sta 1,s
     bra noShiftKeysPressed
-tryCtrl:
-    bit #$000C
+tryShift:
+    bit #$0003
     beq noShiftKeysPressed
-    lda #$0200
+    lda #$0100
     ora 1,s
     sta 1,s
 noShiftKeysPressed:
