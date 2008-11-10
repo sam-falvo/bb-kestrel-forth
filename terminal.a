@@ -747,7 +747,7 @@ L:  lda 0,x
     ; Post-conditions with interrupt handler:
     ;   Blocks until a raw keyboard scancode becomes available.
     ;   A = key code retrieved.
-    ;   shiftState updated.
+    ;   shiftStatus updated.
 
 L:  lda rawKeyEvents
     beq L
@@ -870,5 +870,156 @@ andTable:
 
 hextable:
     .byte "0123456789ABCDEF"
+.endproc
+
+.export tioShiftStatus
+.proc tioShiftStatus
+    lda shiftStatus
+    rts
+.endproc
+
+.export tioAsciiCode
+.proc tioAsciiCode
+    ; Converts a raw keycode acquired from tioGetKey into an ASCII
+    ; value.
+    ;
+    ; Pre-conditions:
+    ;   A = raw key code
+    ;
+    ; Post-conditions:
+    ;   A = ASCII code if successful; -1 otherwise.
+    ;   X, Y unmodified.
+    ;   Flags set.
+
+    bit #$8000
+    bne keyDown
+    lda #$FFFF
+    rts
+
+keyDown:
+    phx
+    and #$007F
+    pha
+    ; S = [rawCode, X]
+
+    lda shiftStatus
+    and #$0003
+    beq noShiftKeysPressed
+    lda #$0100
+    ora 1,s
+    sta 1,s
+noShiftKeysPressed:
+    ; S = [tableOffset, X]
+
+    plx
+    lda translationTable-1,x  ; -1 pointer bias makes testing the high bit easy.
+    bmi notAscii
+    ; S = [X]
+    ; A = 256*asciiCode+n, where 0 <= n < 256
+
+    xba
+    and #$00FF
+    pha
+    ; S = [asciiCode, X]
+
+    lda shiftStatus
+    and #$800C
+    beq noCtrlCapsLock
+
+    lda 1,s
+    cmp #$0061
+    bcc noCtrlCapsLock      ; asciiValue < $61 ('a')
+    cmp #$007B
+    bcs noCtrlCapsLock      ; asciiValue > $7A ('z')
+    eor #$0020
+    sta 1,s
+
+noCtrlCapsLock:
+
+    ; S = [asciiCode, X]
+    pla
+    plx
+    ora #$0000
+    rts
+
+notAscii:
+    ; S = [X]
+    lda #$FFFF
+    plx
+    ora #$0000
+    rts
+
+translationTable:
+    ;
+    ; Unshifted
+    ;
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +00
+    .byte   $FF, $1B, '1', '2', '3', '4', '5', '6'      ; +08
+    .byte   '7', '8', '9', '0', '-', '=', $08, $09      ; +10
+    .byte   'q', 'w', 'e', 'r', 't', 'y', 'u', 'i'      ; +18
+    .byte   'o', 'p', '[', ']', $0D, $FF, 'a', 's'      ; +20
+    .byte   'd', 'f', 'g', 'h', 'j', 'k', 'l', ';'      ; +28
+    .byte   "'", '`', $FF, '\', 'z', 'x', 'c', 'v'      ; +30
+    .byte   'b', 'n', 'm', ',', '.', '/', $FF, '*'      ; +38
+    .byte   $FF, $20, $FF, $FF, $FF, $FF, $FF, $FF      ; +40
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, '7'      ; +48
+    .byte   '8', '9', '-', '4', '5', '6', '+', '1'      ; +50
+    .byte   '2', '3', '0', '.', $FF, $FF, $FF, $FF      ; +58
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +60
+    .byte   $FF, $FF, $FF, $FF, $0D, $FF, $FF, $FF      ; +68
+    .byte   '/', $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +70
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +78
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +80
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +88
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +90
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +98
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +A0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +A8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +B0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +B8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +C0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +C8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +D0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +D8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +E0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +E8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +F0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +F8
+
+    ;
+    ; Shifted
+    ;
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +00
+    .byte   $FF, $1B, '!', '@', '#', '$', '%', '^'      ; +08
+    .byte   '&', '*', '(', ')', '_', '+', $08, $09      ; +10
+    .byte   'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I'      ; +18
+    .byte   'O', 'P', '{', '}', $0D, $FF, 'A', 'S'      ; +20
+    .byte   'D', 'F', 'G', 'H', 'J', 'K', 'L', ':'      ; +28
+    .byte   '"', '~', $FF, '|', 'Z', 'X', 'C', 'V'      ; +30
+    .byte   'B', 'N', 'M', '<', '>', '?', $FF, '*'      ; +38
+    .byte   $FF, $20, $FF, $FF, $FF, $FF, $FF, $FF      ; +40
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, '7'      ; +48
+    .byte   '8', '9', '-', '4', '5', '6', '+', '1'      ; +50
+    .byte   '2', '3', '0', '.', $FF, $FF, $FF, $FF      ; +58
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +60
+    .byte   $FF, $FF, $FF, $FF, $0D, $FF, $FF, $FF      ; +68
+    .byte   '/', $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +70
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +78
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +80
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +88
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +90
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +98
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +A0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +A8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +B0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +B8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +C0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +C8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +D0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +D8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +E0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +E8
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +F0
+    .byte   $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF      ; +F8
 .endproc
 
