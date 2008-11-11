@@ -51,7 +51,8 @@ rawKeyEvents:
     ;      7: right logo
     ;      8: reserved for (currently non-existant) left menu
     ;      9: right menu
-    ;  10-13: 0
+    ;  10-12: 0
+    ;     13: INS-mode
     ;     14: NUM-lock
     ;     15: CAPS-lock
 .export shiftStatus
@@ -117,6 +118,7 @@ _font:  .res 4
     lda #romFont
     sta _font
     stz _font+2
+    stz shiftStatus
     pla
     rts
 .endproc
@@ -636,14 +638,24 @@ _noop:
     pha
     ; S = [p,D,Y,X,A]
 
+    lda shiftStatus
+    asl
+    asl
+    asl
+    lda #$FF
+    bcc L0
+    eor #$55
+L0: pha
+    ; S = [mask, p, D, Y, X, A]
+
     tsc
     tcd
 
     ldy #0
     ldx #8
-L:  lda [1],y
-    eor #$FF
-    sta [1],y
+L:  lda [3],y
+    eor 1,s
+    sta [3],y
     tya
     clc
     adc #80
@@ -651,7 +663,8 @@ L:  lda [1],y
     dex
     bne L
 
-    ; S = [p, D, Y, X, A]
+    ; S = [mask, p, D, Y, X, A]
+    plx
     plx
     plx
     ; S = [D,Y,X,A]
@@ -780,7 +793,8 @@ L1: bne L0
     ; Post-conditions with interrupt handler:
     ;   Blocks until a raw keyboard scancode becomes available.
     ;   A = key code retrieved.
-    ;   shiftStatus updated.
+    ;   shiftStatus updated, including NUMLOCK, CAPSLOCK, and INSERT modes.
+    ;   Cursor shape changes depending on whether or not in insert mode.
 
 L:  lda rawKeyEvents
     beq L
@@ -796,55 +810,56 @@ L:  lda rawKeyEvents
     phx
     ; S = [X, keycode]
 
+    jsr tioHideCursor
     ldx #0      ; let X = 2*index in...
     ; index = 0
-L1: ; INVARIANT: 0 <= index < 22
-    ; index+1 <= 22
+L1: ; INVARIANT: 0 <= index < 23
+    ; index+1 <= 23
     lda shiftCmpTable,x
     cmp 3,s
     beq shiftDetected
     inx
-    inx         ; index <= 22
-    cpx #44
-    bcc L1      ; index < 22
-    ; index = 22
+    inx         ; index <= 24
+    cpx #48
+    bcc L1      ; index < 24
+    ; index = 24
     ; keycode not in shiftTable
     ; shiftStatus = old shiftStatus
     ; ((keycode in shiftTable[DOWN_RANGE]) & ((shiftStatus and shiftTable[keycode]) /= 0)
     ;  and (keycode in shiftTable[UP_RANGE]) & ((shiftStatus and shiftTable[keycode]) = 0)
     ;  and (keycode not in shiftTable) & (shiftStatus = old shiftStatus))
     ; S = [X, keycode]
+L2: jsr tioShowCursor
     plx
     pla
     rts
 
 shiftDetected:
     ; S = [X, keycode]
-    ; X = 2*index; 0 <= index < 22
+    ; X = 2*index; 0 <= index < 24
     lda shiftStatus
     and andTable,x
-    ora orTable,x
+    eor xorTable,x
     sta shiftStatus
     ; ((keycode in shiftTable[DOWN_RANGE]) & ((shiftStatus and shiftTable[keycode]) /= 0)
     ;  and (keycode in shiftTable[UP_RANGE]) & ((shiftStatus and shiftTable[keycode]) = 0)
     ;  and (keycode not in shiftTable) & (shiftStatus = old shiftStatus))
     ; S = [X, keycode]
-    plx
-    pla
-    rts
+    bra L2
 
 shiftCmpTable:
-    ;     LShift RShift LCtrl  RCtrl  LAlt   RAlt   LLogo  RLogo  RMenu  CAPS   NUMLK
-    .word $8032, $803E, $8025, $806D, $8040, $8071, $8073, $8074, $8075, $8042, $804D     ; DOWN
-    .word $0032, $003E, $0025, $006D, $0040, $0071, $0073, $0074, $0075, $0042, $004D     ; UP
+    ;     LShift RShift LCtrl  RCtrl  LAlt   RAlt   LLogo  RLogo  RMenu  CAPS   NUMLK  INS
+    .word $8032, $803E, $8025, $806D, $8040, $8071, $8073, $8074, $8075, $8042, $804D, $806A     ; DOWN
+    .word $0032, $003E, $0025, $006D, $0040, $0071, $0073, $0074, $0075, $0042, $004D, $006A     ; UP
 
-orTable:
-    .word $0001, $0002, $0004, $0008, $0010, $0020, $0040, $0080, $0200, $8000, $4000     ; DOWN
-    .word $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000     ; UP
+xorTable:
+    .word $0001, $0002, $0004, $0008, $0010, $0020, $0040, $0080, $0200, $8000, $4000, $2000     ; DOWN
+    .word $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000, $0000     ; UP
 
 andTable:
-    .word $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF     ; DOWN
-    .word $FFFE, $FFFD, $FFFB, $FFF7, $FFEF, $FFDF, $FFBF, $FF7F, $FDFF, $7FFF, $BFFF     ; UP
+;   .word $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF, $FFFF     ; DOWN
+    .word $FFFE, $FFFD, $FFFB, $FFF7, $FFEF, $FFDF, $FFBF, $FF7F, $FDFF, $7FFF, $BFFF, $FFFF     ; DOWN
+    .word $FFFE, $FFFD, $FFFB, $FFF7, $FFEF, $FFDF, $FFBF, $FF7F, $FDFF, $7FFF, $BFFF, $FFFF     ; UP
 .endproc
 
 .export tioTypeHex16

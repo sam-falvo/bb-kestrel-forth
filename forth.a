@@ -12,6 +12,7 @@
     .import tioCursorLeft
     .import tioCursorRight
     .import tioGetKey
+    .import tioShiftStatus
     .import tioTypeCharacter
     .import tioTypeString
 
@@ -261,6 +262,61 @@ insertOrOverwrite:
     ; 0 <= i+1 <= uACTUAL <= uMAX
     ; A is in printable subset of ASCII set
     ; Y = i
+    pha
+    ; S = [character ...]
+    jsr tioShiftStatus
+    bit #$2000
+    bne insert
+    pla
+    ; S = [...]
+    jmp overwrite
+
+insert:
+    ; 0 <= i < uACTUAL <= uMAX
+    ; 0 <= i+1 <= uACTUAL <= uMAX
+    ; Y = i
+    ; S = [character ...]
+
+    lda uACTUAL
+    cmp uMAX
+    bne a1
+    pla
+    ; S = [,..]
+    ; 0 <= i+1 <= uACTUAL = uMAX
+    ; ignore typed characters to avoid memory corruption
+    jmp a0
+
+a1: ; buffer[0:uACTUAL] = text typed so far
+    ; 0 <= i+1 <= uACTUAL < uMAX
+    ; 0 <= i+1 <= uACTUAL+1 <= uMAX
+    ; S = [character ...]
+
+    lda uACTUAL
+    dec
+    clc
+    adc caddr
+    tax
+    ; X = final source address
+    txy
+    iny
+    ; Y = final destination address
+    lda uACTUAL
+    dec
+    sec
+    sbc i
+    ; A = number of characters to move up in memory
+    mvp 0,0
+    ldy i
+    ; buffer[0:i] = text typed
+    ; buffer[i] = space
+    ; buffer[i+1:uACTUAL] = text typed
+    ; 0 <= i+1 <= uACTUAL+1 <= uMAX
+    inc uACTUAL
+    ; 0 <= i+1 <= uACTUAL <= uMAX
+    pla
+    ; 0 <= i+1 <= uACTUAL <= uMAX
+    ; Y = i
+    ; A = printable ASCII character
     jmp overwrite
 .endproc
 
