@@ -10,6 +10,7 @@
     .import tioAsciiCode
     .import tioCarriageReturn
     .import tioCursorLeft
+    .import tioCursorRight
     .import tioGetKey
     .import tioTypeCharacter
     .import tioTypeString
@@ -169,10 +170,12 @@ a0: ; INVARIANT: 0 <= i <= uACTUAL <= uMAX
     jsr tioGetKey
     ; RS: D Y X caddr uMAX i uACTUAL
     ; A = raw keyboard event
-    cmp #$8024              ; carriage return?
+    cmp #$8024
     beq onCR
-    cmp #$8064              ; cursor left
+    cmp #$8064
     beq onCursorLeft
+    cmp #$8066
+    beq onCursorRight
 ;   pha
 ;   jsr tioTypeHex16
 ;   pla
@@ -234,6 +237,21 @@ onCursorLeft:
     jsr tioCursorLeft
 flushLeft:
     ; 0 <= i < uACTUAL
+    jmp a0
+
+onCursorRight:
+    ; 0 <= i <= uACTUAL <= uMAX
+    lda i
+    cmp uACTUAL
+    beq flushRight  ; i = uACTUAL
+    ; i < uACTUAL
+    ; i+1 <= uACTUAL
+    inc
+    ; i <= uACTUAL
+    sta i
+    jsr tioCursorRight
+flushRight:
+    ; i <= uACTUAL
     jmp a0
 .endproc
 
