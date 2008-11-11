@@ -10,6 +10,7 @@
     .import tioAsciiCode
     .import tioCarriageReturn
     .import tioGetKey
+    .import tioTypeCharacter
     .import tioTypeString
 
 
@@ -118,6 +119,7 @@ i:  sta 0,x
 
 .proc _EVALUATE
     ; DS: caddr u
+    jmp _TYPE
     inx
     inx
     inx
@@ -154,21 +156,42 @@ i:  sta 0,x
     tsc
     tcd
 
-caddr   = 5
-uMAX    = 7
-i       = 9
-uACTUAL = 11
+caddr   = 7
+uMAX    = 9
+i       = 11
+uACTUAL = 13
 
 a0: jsr tioGetKey
     jsr tioAsciiCode
     bmi a0
-    ; A = valid ASCII character
 
+    ; A = valid ASCII character
+    ; RS: D Y X caddr uMAX i uACTUAL
     cmp #$000D
     beq onCR
+
+    cmp #$0020
+    bcc a0
+    ; A in PRINTABLE set
+    ldy i
+    cpy uACTUAL
+    bne a0
+    cpy uMAX
+    bcs a0
+    A8X16
+    sta (caddr),y
+    AX16
+    jsr tioTypeCharacter
+    inc i
+    inc uACTUAL
     jmp a0
-    
+
+
+    jsr tioTypeCharacter
+    jmp a0
+
 onCR:
+    ; RS: D Y X caddr uMAX i uACTUAL
     pld
     ply
     plx
