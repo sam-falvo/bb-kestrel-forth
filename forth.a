@@ -2,8 +2,135 @@
     .a16
     .i16
 
+
+    .include "hw/cpu.inc"
+
+
+    ; from terminal.a
+    .import tioCarriageReturn
+    .import tioTypeString
+
+
+    .segment "BSSEXT"
+
+TIB_size = 80
+TIB_addr:
+    .res    TIB_size
+
+
+    .rodata
+
+coldSignOnMsg:
+    .byte "Kestrel Forth V0"
+coldSignOnLen = *-coldSignOnMsg
+
+okMsg:
+    .byte "   ok"
+okLen = *-okMsg
+
+
+    .code
+
 .export forthColdBoot
 .proc forthColdBoot
-    jmp *
+    ldx #coldSignOnMsg
+    ldy #coldSignOnLen
+    jsr tioTypeString
+    jsr tioCarriageReturn
+.endproc
+    ; fall-through
+.proc _QUIT
+    ; DSP (X) undefined.  RSP (S) undefined.
+    lda #$7FFF
+    tcs
+    lda #$0000
+    tcd
+    ldx #$0FE
+    ; DSP and RSP reset to power-on values.
+
+q:  jsr interpret
+    jmp q
+.endproc
+
+.proc interpret
+    sta 0,x
+    dex
+    dex
+    lda #TIB_addr
+    sta 0,x
+    dex
+    dex
+    lda #TIB_size
+    ; DS: 'TIB /TIB
+    jsr _ACCEPT
+    ; DS: span
+    sta 0,x
+    dex
+    dex
+    ldy #TIB_addr
+    lda 2,x
+    sty 2,x
+    ; DS: 'TIB span
+    jsr _EVALUATE
+    ; DS:
+    jsr i
+    .byte "  ok"
+i:  sta 0,x
+    dex
+    dex
+    pla
+    inc
+    ; DS: "ok".addr
+    sta 0,x
+    dex
+    dex
+    lda #4
+    ; DS: "ok".addr "ok".length
+    jsr _TYPE
+    jmp _CR
+.endproc
+
+
+.proc _CR
+    jmp tioCarriageReturn
+.endproc
+
+
+.proc _TYPE
+    ; DS: caddr length
+    tay                 ; Y = length
+    lda 2,x
+    phx
+    tax                 ; X = caddr
+    jsr tioTypeString
+    plx
+    inx
+    inx
+    inx
+    inx
+    lda 0,x
+    ; DS:
+    rts
+.endproc
+
+
+.proc _EVALUATE
+    ; DS: caddr u
+    inx
+    inx
+    inx
+    inx
+    lda 0,x
+    ; DS:
+    rts
+.endproc
+
+
+.proc _ACCEPT
+    ; DS: caddr uMAX
+    inx
+    inx
+    ; DS: uACTUAL
+    rts
 .endproc
 
