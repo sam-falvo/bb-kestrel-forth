@@ -192,7 +192,8 @@ a0: ; INVARIANT: 0 <= i <= uACTUAL <= uMAX
     ; A in printable subset
     ldy i
     cpy uACTUAL
-    bne a0                  ; not appending
+    bcc insertOrOverwrite
+    bne a0                  ; Illegal state: memory corruption imminent!  Prevent further damage.
     ; i = uACTUAL, thus we're...
 
 appendingToBuffer:
@@ -252,6 +253,19 @@ onCursorRight:
     jsr tioCursorRight
 flushRight:
     ; i <= uACTUAL
+    jmp a0
+
+insertOrOverwrite:
+    ; 0 <= i < uACTUAL <= uMAX
+    ; 0 <= i+1 <= uACTUAL <= uMAX
+    ; A is in printable subset of ASCII set
+    ; Y = i
+    A8X16
+    sta (caddr),y
+    AX16
+    jsr tioTypeCharacter
+    inc i
+    ; 0 <= i <= uACTUAL <= uMAX
     jmp a0
 .endproc
 
