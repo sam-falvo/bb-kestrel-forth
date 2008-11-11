@@ -273,6 +273,33 @@ cx_1_ge_right:              ; S = [A], (cx+1) >= right
     jmp i_CursorDown
 .endproc
 
+.export tioCursorLeft
+.proc tioCursorLeft
+    jsr tioHideCursor
+    jsr i_CursorLeft
+    jmp tioShowCursor
+.endproc
+
+.proc i_CursorLeft
+    ; Advance the cursor left one character.
+    ;
+    ; pre-conditions:
+    ;   0 <= cx < right
+    ;
+    ; post-conditions:
+    ;   0 <= cx < old cx < right
+
+    pha
+    lda cx              ; 0 <= cx < right
+    beq flushLeft       ; 0 = cx; already done.
+    dec                 ; 0 < cx-1 ... 0 <= cx
+    sta cx
+    ; 0 <= cx < right
+flushLeft:
+    pla
+    rts
+.endproc
+
 .export tioCursorDown
 .proc tioCursorDown
     jsr tioHideCursor

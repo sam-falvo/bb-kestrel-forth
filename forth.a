@@ -9,10 +9,12 @@
     ; from terminal.a
     .import tioAsciiCode
     .import tioCarriageReturn
+    .import tioCursorLeft
     .import tioGetKey
     .import tioTypeCharacter
     .import tioTypeString
 
+    .import tioTypeHex16
 
     .segment "BSSEXT"
 
@@ -169,6 +171,11 @@ a0: ; INVARIANT: 0 <= i <= uACTUAL <= uMAX
     ; A = raw keyboard event
     cmp #$8024              ; carriage return?
     beq onCR
+    cmp #$8064              ; cursor left
+    beq onCursorLeft
+;   pha
+;   jsr tioTypeHex16
+;   pla
     ; A = raw keyboard event
     jsr tioAsciiCode
     ; A = -1 if untranslatable code; ASCII code otherwise
@@ -203,9 +210,6 @@ appendingToBuffer:
     jmp a0
 
 
-    jsr tioTypeCharacter
-    jmp a0
-
 onCR:
     ; RS: D Y X caddr uMAX i uACTUAL
     pld
@@ -217,5 +221,19 @@ onCR:
     pla
     ; DS: uACTUAL
     rts
+
+onCursorLeft:
+    ; 0 <= i <= uACTUAL <= uMAX
+    lda i
+    beq flushLeft   ; 0 = i
+    ; 0 < i
+    ; 0 <= i-1
+    dec
+    ; 0 <= i
+    sta i
+    jsr tioCursorLeft
+flushLeft:
+    ; 0 <= i < uACTUAL
+    jmp a0
 .endproc
 
