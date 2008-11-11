@@ -7,7 +7,9 @@
 
 
     ; from terminal.a
+    .import tioAsciiCode
     .import tioCarriageReturn
+    .import tioGetKey
     .import tioTypeString
 
 
@@ -128,8 +130,52 @@ i:  sta 0,x
 
 .proc _ACCEPT
     ; DS: caddr uMAX
+    pea 0
+    pea 0
+    ; DS: caddr uMAX
+    ; RS: i uACTUAL
+    pha
     inx
     inx
+    lda 0,x
+    ; DS: caddr
+    ; RS: uMAX i uACTUAL
+    pha
+    inx
+    inx
+    ; DS:
+    ; RS: caddr uMAX i uACTUAL
+    ; A free.
+    phx
+    phy
+    phd
+
+    ; RS: D Y X caddr uMAX i uACTUAL
+    tsc
+    tcd
+
+caddr   = 5
+uMAX    = 7
+i       = 9
+uACTUAL = 11
+
+a0: jsr tioGetKey
+    jsr tioAsciiCode
+    bmi a0
+    ; A = valid ASCII character
+
+    cmp #$000D
+    beq onCR
+    jmp a0
+    
+onCR:
+    pld
+    ply
+    plx
+    pla
+    pla
+    pla
+    pla
     ; DS: uACTUAL
     rts
 .endproc
