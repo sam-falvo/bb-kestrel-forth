@@ -119,6 +119,7 @@ i:  sta 0,x
 
 .proc _EVALUATE
     ; DS: caddr u
+    jsr tioCarriageReturn
     jmp _TYPE
     inx
     inx
@@ -135,7 +136,7 @@ i:  sta 0,x
     pea 0
     pea 0
     ; DS: caddr uMAX
-    ; RS: i uACTUAL
+    ; RS: i=0 uACTUAL=0
     pha
     inx
     inx
@@ -152,22 +153,25 @@ i:  sta 0,x
     phy
     phd
 
-    ; RS: D Y X caddr uMAX i uACTUAL
+    ; RS: D Y X caddr uMAX i=0 uACTUAL=0
     tsc
     tcd
 
-caddr   = 7
-uMAX    = 9
-i       = 11
-uACTUAL = 13
+caddr   = 7     ; base address of storage buffer
+uMAX    = 9     ; the total size of the buffer
+i       = 11    ; the insertion offset into the buffer
+uACTUAL = 13    ; the total string length inside the buffer
 
-a0: jsr tioGetKey
+    ; i = uACTUAL = 0
+a0: ; INVARIANT: 0 <= i <= uACTUAL <= uMAX
+    jsr tioGetKey
     ; RS: D Y X caddr uMAX i uACTUAL
     ; A = raw keyboard event
     cmp #$8024              ; carriage return?
     beq onCR
     ; A = raw keyboard event
     jsr tioAsciiCode
+    ; A = -1 if untranslatable code; ASCII code otherwise
     bmi a0
     ; A = an ASCII character
 
@@ -175,18 +179,27 @@ a0: jsr tioGetKey
     ; A = an ASCII character
     cmp #$0020
     bcc a0
-    ; A in PRINTABLE set
+    ; A in printable subset
     ldy i
     cpy uACTUAL
     bne a0                  ; not appending
+    ; i = uACTUAL, thus we're...
+
+appendingToBuffer:
+    ; Y = i
+    ; 0 <= i = uACTUAL <= uMAX
     cpy uMAX
-    bcs a0                  ; too many characters in buffer already
+    bcs a0                  ; i = uACTUAL = uMAX
+    ; 0 <= i = uACTUAL < uMAX
+    ; 0 <= i+1 = uACTUAL+1 <= uMAX
     A8X16
     sta (caddr),y
     AX16
     jsr tioTypeCharacter
     inc i
+    ; 0 <= i = uACTUAL+1 <= uMAX
     inc uACTUAL
+    ; 0 <= i = uACTUAL <= uMAX
     jmp a0
 
 
