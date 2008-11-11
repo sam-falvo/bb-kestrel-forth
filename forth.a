@@ -212,7 +212,7 @@ overwrite:
     AX16
     jsr tioTypeCharacter
     inc i
-    ; 0 <= i = uACTUAL+1 <= uMAX
+    ; 0 <= i = uACTUAL <= uMAX
     jmp a0
 
 
