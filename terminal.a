@@ -694,12 +694,18 @@ L:  lda [1],y
     phx
     phy
 
-L:  lda 0,x
+    ; Y >= 0
+    cpy #$0000
+    bra L1
+L0: ; Y-1 >= 0
+    lda 0,x
     and #$00FF
     jsr i_TypeCharacter
     inx
     dey
-    bne L
+    ; Y >= 0
+L1: bne L0
+    ; Y = 0
 
     ply
     plx

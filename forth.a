@@ -16,9 +16,9 @@
 
     .segment "BSSEXT"
 
-TIB_size = 80
+TIB_size = 79
 TIB_addr:
-    .res    TIB_size
+    .res    TIB_size+1
 
 
     .rodata
@@ -162,22 +162,25 @@ i       = 11
 uACTUAL = 13
 
 a0: jsr tioGetKey
+    ; RS: D Y X caddr uMAX i uACTUAL
+    ; A = raw keyboard event
+    cmp #$8024              ; carriage return?
+    beq onCR
+    ; A = raw keyboard event
     jsr tioAsciiCode
     bmi a0
+    ; A = an ASCII character
 
-    ; A = valid ASCII character
     ; RS: D Y X caddr uMAX i uACTUAL
-    cmp #$000D
-    beq onCR
-
+    ; A = an ASCII character
     cmp #$0020
     bcc a0
     ; A in PRINTABLE set
     ldy i
     cpy uACTUAL
-    bne a0
+    bne a0                  ; not appending
     cpy uMAX
-    bcs a0
+    bcs a0                  ; too many characters in buffer already
     A8X16
     sta (caddr),y
     AX16
