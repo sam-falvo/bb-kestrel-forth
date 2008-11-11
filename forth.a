@@ -203,14 +203,15 @@ appendingToBuffer:
     bcs a0                  ; i = uACTUAL = uMAX
     ; 0 <= i = uACTUAL < uMAX
     ; 0 <= i+1 = uACTUAL+1 <= uMAX
+    inc uACTUAL
+    ; 0 <= i+1 = uACTUAL <= uMAX
+overwrite:
     A8X16
     sta (caddr),y
     AX16
     jsr tioTypeCharacter
     inc i
     ; 0 <= i = uACTUAL+1 <= uMAX
-    inc uACTUAL
-    ; 0 <= i = uACTUAL <= uMAX
     jmp a0
 
 
@@ -260,12 +261,6 @@ insertOrOverwrite:
     ; 0 <= i+1 <= uACTUAL <= uMAX
     ; A is in printable subset of ASCII set
     ; Y = i
-    A8X16
-    sta (caddr),y
-    AX16
-    jsr tioTypeCharacter
-    inc i
-    ; 0 <= i <= uACTUAL <= uMAX
-    jmp a0
+    jmp overwrite
 .endproc
 
